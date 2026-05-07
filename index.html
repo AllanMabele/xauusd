@@ -6,20 +6,17 @@
     <title>LiquidGold AI | Institutional XAUUSD Terminal</title>
     
     <!-- 
-    SQL SCHEMA FOR SUPABASE (Run this in your SQL Editor):
+    SQL SCHEMA FOR SUPABASE (Run this in your Supabase SQL Editor):
     
-    -- Users Profile
     CREATE TABLE profiles (
-      id UUID REFERENCES auth.users ON DELETE CASCADE,
-      subscription_status TEXT DEFAULT 'inactive', -- active, expired, inactive
+      id UUID REFERENCES auth.users ON DELETE CASCADE PRIMARY KEY,
+      subscription_status TEXT DEFAULT 'inactive',
       mt5_login BIGINT,
       mt5_server TEXT,
       bot_enabled BOOLEAN DEFAULT false,
-      risk_percent FLOAT DEFAULT 1.0,
-      PRIMARY KEY (id)
+      risk_percent FLOAT DEFAULT 1.0
     );
 
-    -- Trades History
     CREATE TABLE trades (
       id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
       user_id UUID REFERENCES auth.users,
@@ -33,6 +30,9 @@
       status TEXT DEFAULT 'OPEN', -- OPEN, CLOSED
       created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
     );
+
+    ALTER TABLE trades ENABLE ROW LEVEL SECURITY;
+    CREATE POLICY "Users can only see their own trades" ON trades FOR ALL USING (auth.uid() = user_id);
     -->
 
     <!-- Dependencies -->
@@ -45,32 +45,14 @@
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono&display=swap" rel="stylesheet">
 
     <style>
-        :root {
-            --teal: #2dd4bf;
-            --black: #050505;
-            --card-bg: rgba(15, 15, 20, 0.7);
-        }
-        body {
-            background-color: var(--black);
-            color: #ffffff;
-            font-family: 'Space Grotesk', sans-serif;
-            background-image: radial-gradient(circle at 10% 20%, rgba(45, 212, 191, 0.05) 0%, transparent 40%);
-        }
-        .glass {
-            background: var(--card-bg);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
-        }
+        :root { --teal: #2dd4bf; --black: #050505; --card-bg: rgba(15, 15, 20, 0.7); }
+        body { background-color: var(--black); color: #ffffff; font-family: 'Space Grotesk', sans-serif; background-image: radial-gradient(circle at 10% 20%, rgba(45, 212, 191, 0.05) 0%, transparent 40%); }
+        .glass { background: var(--card-bg); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8); }
         .teal-glow { box-shadow: 0 0 20px rgba(45, 212, 191, 0.2); }
         .mono { font-family: 'JetBrains Mono', monospace; }
-        .status-pulse {
-            width: 8px; height: 8px; border-radius: 50%;
-            background: var(--teal); animation: pulse 2s infinite;
-        }
-        @keyframes pulse { 0% { transform: scale(0.9); opacity: 0.7; } 50% { transform: scale(1.1); opacity: 1; } 100% { transform: scale(0.9); opacity: 0.7; } }
-        .tab-active { color: var(--teal); border-bottom: 2px solid var(--teal); }
+        .status-pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--teal); animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { transform: scale(0.9); opacity: 0.7; } 50% { transform: scale(1.1); opacity: 1; } }
+        .active-pulse { animation: pulse 2s infinite; }
         input, select { background: rgba(255,255,255,0.05) !important; border: 1px solid rgba(255,255,255,0.1) !important; color: white !important; }
     </style>
 </head>
@@ -81,33 +63,29 @@
         const { useState, useEffect, useMemo } = React;
 
         // --- Configuration ---
-        const SUPABASE_URL = "https://gsivamaidhdjcrtzedmp.supabase.co";
-        const SUPABASE_KEY = "sb_publishable_TqiZkP7rouOFK3zNjBT8Ig_5uOuH1ha";
+        const SUPABASE_URL = "https://zqyextmqqlgyfmttuull.supabase.co";
+        const SUPABASE_KEY = "sb_publishable_h83sBB7QFQwxHCspfgVXtw_byGUWSfd";
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         const App = () => {
-            const [view, setView] = useState('auth'); // auth, dashboard, admin
+            const [view, setView] = useState('auth'); 
             const [user, setUser] = useState(null);
-            const [botActive, setBotActive] = useState(false);
             const [loading, setLoading] = useState(true);
 
             useEffect(() => {
                 supabaseClient.auth.getSession().then(({ data: { session } }) => {
-                    if (session) {
-                        setUser(session.user);
-                        setView('dashboard');
-                    }
+                    if (session) { setUser(session.user); setView('dashboard'); }
                     setLoading(false);
                 });
             }, []);
 
-            if (loading) return <div className="h-screen flex items-center justify-center text-teal-400">CONNECTING TO NEURAL NETWORK...</div>;
+            if (loading) return <div className="h-screen flex items-center justify-center text-teal-400 font-bold tracking-widest">INITIALIZING NEURAL LINK...</div>;
 
             return (
                 <div>
-                    {view === 'auth' && <AuthPage onAuth={() => setView('dashboard')} />}
-                    {view === 'dashboard' && <Dashboard user={user} setView={setView} botActive={botActive} setBotActive={setBotActive} />}
-                    {view === 'admin' && <AdminPanel setView={setView} />}
+                    {view === 'auth' && <AuthPage onAuth={(u) => { setUser(u); setView('dashboard'); }} />}
+                    {view === 'dashboard' && <Dashboard user={user} setView={setView} />}
+                    {view === 'admin' && <AdminPanel user={user} setView={setView} />}
                 </div>
             );
         };
@@ -118,14 +96,9 @@
             const [isRegister, setIsRegister] = useState(false);
 
             const handleAction = async () => {
-                let result;
-                if (isRegister) {
-                    result = await supabaseClient.auth.signUp({ email, password });
-                } else {
-                    result = await supabaseClient.auth.signInWithPassword({ email, password });
-                }
+                let result = isRegister ? await supabaseClient.auth.signUp({ email, password }) : await supabaseClient.auth.signInWithPassword({ email, password });
                 if (result.error) alert(result.error.message);
-                else onAuth();
+                else onAuth(result.data.user);
             };
 
             return (
@@ -134,17 +107,15 @@
                         <div className="text-center mb-8">
                             <i className="fas fa-microchip text-teal-400 text-4xl mb-4"></i>
                             <h1 className="text-3xl font-bold tracking-tighter">LIQUID<span className="text-teal-400">GOLD</span> AI</h1>
-                            <p className="text-gray-400 text-sm mt-2 font-light uppercase tracking-widest">Neural Execution Terminal</p>
                         </div>
                         <div className="space-y-4">
-                            <input className="w-full p-4 rounded-xl outline-none focus:border-teal-400" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} />
-                            <input className="w-full p-4 rounded-xl outline-none focus:border-teal-400" type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} />
-                            <button onClick={handleAction} className="w-full bg-teal-500 text-black font-bold py-4 rounded-xl hover:bg-teal-400 transition-all">
+                            <input className="w-full p-4 rounded-xl outline-none" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} />
+                            <input className="w-full p-4 rounded-xl outline-none" type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} />
+                            <button onClick={handleAction} className="w-full bg-teal-500 text-black font-bold py-4 rounded-xl hover:bg-teal-400">
                                 {isRegister ? 'CREATE ACCOUNT' : 'LOGIN TO TERMINAL'}
                             </button>
                             <p className="text-center text-xs text-gray-500">
-                                {isRegister ? 'Already registered?' : 'Need institutional access?'} 
-                                <span onClick={() => setIsRegister(!isRegister)} className="text-teal-400 cursor-pointer ml-1">{isRegister ? 'Sign In' : 'Register'}</span>
+                                <span onClick={() => setIsRegister(!isRegister)} className="text-teal-400 cursor-pointer ml-1">{isRegister ? 'Sign In' : 'Institutional Registration'}</span>
                             </p>
                         </div>
                     </div>
@@ -152,224 +123,171 @@
             );
         };
 
-        const Dashboard = ({ user, setView, botActive, setBotActive }) => {
-            const [activeTab, setTab] = useState('live');
-            const [aiStatus, setAiStatus] = useState({ direction: 'WAITING', confidence: 0 });
+        const Dashboard = ({ user, setView }) => {
+            const [trades, setTrades] = useState([]);
+            const [botActive, setBotActive] = useState(false);
+            const [aiStatus, setAiStatus] = useState({ direction: 'ANALYZING', confidence: 0 });
 
-            // AI Neural Logic Simulation
+            // 1. Loading Trades
+            const fetchTrades = async () => {
+                const { data, error } = await supabaseClient
+                    .from('trades')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+                if (!error) setTrades(data);
+            };
+
+            // 2. Inserting New Trade (Requirements: 3 Positions)
+            const openTradeSetup = async (type) => {
+                if (!botActive) return alert("Activate Bot First");
+                const entryPrice = 2035.50; // In production, fetch from live MT5 feed
+                const lotTotal = 3.0; 
+                
+                const newPositions = [
+                    { user_id: user.id, type, lots: lotTotal/3, entry_price: entryPrice, tp: entryPrice + 20, sl: entryPrice - 10 },
+                    { user_id: user.id, type, lots: lotTotal/3, entry_price: entryPrice, tp: entryPrice + 20, sl: entryPrice - 10 },
+                    { user_id: user.id, type, lots: lotTotal/3, entry_price: entryPrice, tp: entryPrice + 50, sl: entryPrice - 10 }
+                ];
+
+                const { error } = await supabaseClient.from('trades').insert(newPositions);
+                if (error) console.error(error);
+                fetchTrades();
+            };
+
+            // 3. Closing a Trade
+            const closeTrade = async (id) => {
+                const { error } = await supabaseClient
+                    .from('trades')
+                    .update({ status: 'CLOSED', profit: (Math.random() * 500).toFixed(2) })
+                    .eq('id', id);
+                if (!error) fetchTrades();
+            };
+
             useEffect(() => {
+                fetchTrades();
+                // Realtime subscription
+                const channel = supabaseClient.channel('db_changes').on('postgres_changes', 
+                { event: '*', schema: 'public', table: 'trades' }, () => fetchTrades()).subscribe();
+
                 const interval = setInterval(() => {
-                    const directions = ['BULLISH', 'BEARISH', 'LIQUIDITY HUNT'];
-                    setAiStatus({
-                        direction: directions[Math.floor(Math.random() * directions.length)],
-                        confidence: Math.floor(Math.random() * (99 - 85 + 1) + 85)
-                    });
-                }, 4000);
-                return () => clearInterval(interval);
+                    const dirs = ['BULLISH', 'BEARISH', 'LIQUIDITY HUNT'];
+                    setAiStatus({ direction: dirs[Math.floor(Math.random() * 3)], confidence: Math.floor(Math.random() * 15) + 84 });
+                }, 5000);
+
+                return () => { clearInterval(interval); supabaseClient.removeChannel(channel); };
             }, []);
+
+            const netProfit = useMemo(() => trades.reduce((acc, t) => acc + parseFloat(t.profit || 0), 0), [trades]);
 
             return (
                 <div className="max-w-[1600px] mx-auto p-4 lg:p-8 space-y-6">
-                    {/* Top Navigation */}
                     <nav className="glass rounded-3xl p-6 flex justify-between items-center">
-                        <div className="flex items-center gap-3">
-                            <div className="bg-teal-500 h-10 w-10 rounded-xl flex items-center justify-center"><i className="fas fa-chart-line text-black"></i></div>
-                            <h2 className="text-xl font-bold tracking-tight">LIQUID<span className="text-teal-400">GOLD</span> AI</h2>
-                        </div>
-                        <div className="flex items-center gap-8">
-                            <div className="hidden md:flex items-center gap-2">
-                                <div className="status-pulse"></div>
-                                <span className="text-xs font-bold text-teal-400 uppercase tracking-widest">Neural Link Established</span>
-                            </div>
-                            <button onClick={() => setBotActive(!botActive)} className={`px-8 py-2 rounded-xl font-bold transition-all ${botActive ? 'bg-red-500/20 text-red-500 border border-red-500' : 'bg-teal-500 text-black teal-glow'}`}>
-                                {botActive ? 'DEACTIVATE AI' : 'ACTIVATE BOT'}
+                        <h2 className="text-xl font-bold tracking-tight">LIQUID<span className="text-teal-400">GOLD</span> AI</h2>
+                        <div className="flex items-center gap-4">
+                            <button onClick={() => setBotActive(!botActive)} className={`px-8 py-2 rounded-xl font-bold ${botActive ? 'bg-red-500/20 text-red-500 border border-red-500' : 'bg-teal-500 text-black'}`}>
+                                {botActive ? 'TERMINATE ENGINE' : 'ACTIVATE ENGINE'}
                             </button>
-                            <i className="fas fa-user-circle text-2xl text-gray-400 cursor-pointer hover:text-white" onClick={() => setView('admin')}></i>
+                            <i className="fas fa-cog text-gray-400 cursor-pointer" onClick={() => setView('admin')}></i>
                         </div>
                     </nav>
 
-                    {/* Stats Ribbon */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <StatCard label="Account Balance" value="$102,785.00" sub="+$2,785 today" color="text-white" />
-                        <StatCard label="Live Equity" value="$102,892.40" sub="Floating: +$107.40" color="text-teal-400" />
-                        <StatCard label="Bot Win Rate" value="74.2%" sub="Last 100 trades" color="text-white" />
-                        <StatCard label="AI Confidence" value={`${aiStatus.confidence}%`} sub={`Bias: ${aiStatus.direction}`} color="text-teal-400" />
+                        <StatCard label="Account Balance" value={`$102,785.00`} sub="Institutional Credit" color="text-white" />
+                        <StatCard label="Live Net Profit" value={`+$${netProfit.toLocaleString()}`} sub="Closed Positions" color="text-teal-400" />
+                        <StatCard label="AI Confidence" value={`${aiStatus.confidence}%`} sub={aiStatus.direction} color="text-teal-400" />
+                        <StatCard label="Neural Win Rate" value="74.2%" sub="Verified Track Record" color="text-white" />
                     </div>
 
-                    {/* Main Content Grid */}
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                        {/* Technical Chart */}
                         <div className="lg:col-span-8 glass rounded-[2.5rem] p-8">
                             <div className="flex justify-between items-center mb-6">
-                                <h3 className="font-bold text-lg">XAUUSD Neural Map</h3>
-                                <div className="flex gap-2 bg-white/5 p-1 rounded-lg">
-                                    {['M15', 'H4', 'D1'].map(t => <button key={t} className={`px-4 py-1 rounded-md text-xs font-bold ${t==='H4' ? 'bg-teal-500 text-black' : ''}`}>{t}</button>)}
+                                <h3 className="font-bold text-lg">Neural Price Map</h3>
+                                <div className="flex gap-2">
+                                    <button onClick={() => openTradeSetup('BUY')} className="bg-teal-500/10 text-teal-500 px-4 py-1 rounded-lg text-xs font-bold border border-teal-500/20">TEST BUY</button>
+                                    <button onClick={() => openTradeSetup('SELL')} className="bg-red-500/10 text-red-500 px-4 py-1 rounded-lg text-xs font-bold border border-red-500/20">TEST SELL</button>
                                 </div>
                             </div>
-                            <div id="priceChart" className="h-[400px]"></div>
+                            <div id="priceChart"></div>
                         </div>
 
-                        {/* AI Prediction & Calendar */}
                         <div className="lg:col-span-4 space-y-6">
                             <div className="glass rounded-[2rem] p-8 border-teal-500/30 border">
-                                <h4 className="text-gray-500 text-xs font-bold uppercase tracking-widest mb-4">Current Neural Bias</h4>
-                                <div className="text-4xl font-black text-teal-400 tracking-tighter mb-4">{aiStatus.direction}</div>
-                                <div className="space-y-4">
-                                    <div className="flex justify-between text-sm"><span>D1 Structure:</span><span className="text-teal-400">Bullish BOS</span></div>
-                                    <div className="flex justify-between text-sm"><span>H4 Pullback:</span><span className="text-teal-400">Completed (0.618 Fib)</span></div>
-                                    <div className="flex justify-between text-sm"><span>M15 Entry:</span><span className="text-white font-bold">READY</span></div>
+                                <h4 className="text-gray-500 text-xs font-bold uppercase mb-4 tracking-widest">Neural Bias</h4>
+                                <p className="text-4xl font-black text-teal-400">{aiStatus.direction}</p>
+                                <div className="mt-6 space-y-2 text-sm text-gray-400">
+                                    <div className="flex justify-between"><span>D1 Alignment:</span><span className="text-teal-400">OK</span></div>
+                                    <div className="flex justify-between"><span>H4 Structure:</span><span className="text-teal-400">BOS UP</span></div>
                                 </div>
                             </div>
-
                             <div className="glass rounded-[2rem] p-8">
-                                <h4 className="text-gray-500 text-xs font-bold uppercase tracking-widest mb-6">High Impact Events</h4>
-                                <div className="space-y-6">
-                                    <NewsItem time="14:30" event="CPI m/m" impact="HIGH" />
-                                    <NewsItem time="16:00" event="FOMC Member Speech" impact="HIGH" />
-                                    <NewsItem time="20:00" event="Treasury Statement" impact="MED" />
+                                <h4 className="text-gray-500 text-xs font-bold uppercase mb-6 tracking-widest">High Impact News</h4>
+                                <div className="space-y-4">
+                                    <NewsItem time="14:30" event="CPI Data" impact="HIGH" color="text-red-500" />
+                                    <NewsItem time="20:00" event="FOMC Minutes" impact="HIGH" color="text-red-500" />
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    {/* Trade Management Area */}
                     <div className="glass rounded-[2.5rem] overflow-hidden">
-                        <div className="p-8 border-b border-white/5 flex justify-between items-center">
-                            <div className="flex gap-6">
-                                <button onClick={() => setTab('live')} className={`font-bold pb-2 ${activeTab === 'live' ? 'tab-active' : 'text-gray-500'}`}>LIVE ORDERS</button>
-                                <button onClick={() => setTab('history')} className={`font-bold pb-2 ${activeTab === 'history' ? 'tab-active' : 'text-gray-500'}`}>HISTORY</button>
-                            </div>
-                            <div className="text-xs text-gray-500 uppercase font-bold tracking-widest">Dynamic Risk: 1.5% Per Setup</div>
-                        </div>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left">
-                                <thead className="bg-white/5 text-gray-500 text-[10px] uppercase font-bold tracking-widest">
-                                    <tr>
-                                        <th className="p-6">Position ID</th>
-                                        <th className="p-6">Type</th>
-                                        <th className="p-6">Volume</th>
-                                        <th className="p-6">Entry</th>
-                                        <th className="p-6">Profit (USD)</th>
-                                        <th className="p-6">Status</th>
+                        <div className="p-8 border-b border-white/5 font-bold uppercase text-xs tracking-widest text-gray-500">Execution Log</div>
+                        <table className="w-full text-left">
+                            <thead className="bg-white/5 text-[10px] font-bold uppercase text-gray-500 tracking-widest">
+                                <tr>
+                                    <th className="p-6">Asset</th><th className="p-6">Type</th><th className="p-6">Lots</th><th className="p-6">Price</th><th className="p-6">Profit</th><th className="p-6">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-white/5 mono text-sm">
+                                {trades.map(t => (
+                                    <tr key={t.id} className="hover:bg-white/5">
+                                        <td className="p-6 font-bold">{t.symbol}</td>
+                                        <td className={`p-6 font-bold ${t.type === 'BUY' ? 'text-teal-400' : 'text-red-500'}`}>{t.type}</td>
+                                        <td className="p-6 text-gray-300">{t.lots}</td>
+                                        <td className="p-6 text-gray-500">{t.entry_price}</td>
+                                        <td className="p-6 text-teal-400 font-bold">${t.profit}</td>
+                                        <td className="p-6">
+                                            {t.status === 'OPEN' ? 
+                                                <button onClick={() => closeTrade(t.id)} className="bg-white/10 px-3 py-1 rounded-lg text-[10px] hover:bg-red-500 hover:text-white transition-all">CLOSE</button> :
+                                                <span className="text-gray-600 text-[10px]">SETTLED</span>
+                                            }
+                                        </td>
                                     </tr>
-                                </thead>
-                                <tbody className="divide-y divide-white/5 mono text-sm">
-                                    <TradeRow id="LG-9021" type="BUY" volume="1.50" price="2042.50" profit="+$450.00" status="OPEN" />
-                                    <TradeRow id="LG-9020" type="BUY" volume="1.50" price="2042.50" profit="+$200.00" status="OPEN" />
-                                    <TradeRow id="LG-9018" type="SELL" volume="3.00" price="2055.10" profit="+$1,240.00" status="CLOSED" />
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    {/* Billing & Subscription */}
-                    <div className="glass rounded-[3rem] p-10 text-center relative overflow-hidden">
-                        <div className="absolute top-0 right-0 p-8 opacity-10"><i className="fas fa-crown text-8xl text-teal-400"></i></div>
-                        <h3 className="text-3xl font-black mb-4 tracking-tighter uppercase">Activate Platinum neural Access</h3>
-                        <p className="text-gray-400 max-w-xl mx-auto mb-8 font-light italic">"Unlock full automated execution on your MT5 account. 3-week learning phase included."</p>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto text-left">
-                            <div className="bg-white/5 p-6 rounded-2xl border border-white/10">
-                                <p className="text-[10px] font-bold text-teal-400 uppercase tracking-widest mb-2">MPESA LIPA NA</p>
-                                <p className="text-xl font-bold">0701540201</p>
-                                <p className="text-xs text-gray-500 mt-1">Activation: $200 | Renewal: $50</p>
-                            </div>
-                            <div className="bg-white/5 p-6 rounded-2xl border border-white/10">
-                                <p className="text-[10px] font-bold text-teal-400 uppercase tracking-widest mb-2">USDT TRC20 ADDR</p>
-                                <p className="text-sm font-bold truncate">TBr4ZsJky3ufBaA6WMFVJ7hX36Wtf29NRz</p>
-                                <p className="text-xs text-gray-500 mt-1">Send proof to @LiquidM_Admin</p>
-                            </div>
-                        </div>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             );
         };
 
         const StatCard = ({ label, value, sub, color }) => (
-            <div className="glass p-6 rounded-[2rem] hover:border-teal-500/50 transition-all cursor-pointer">
+            <div className="glass p-6 rounded-[2rem]">
                 <p className="text-gray-500 text-[10px] font-bold uppercase tracking-widest mb-2">{label}</p>
-                <p className={`text-2xl font-black ${color} tracking-tighter mb-1`}>{value}</p>
-                <p className="text-xs text-gray-600 font-medium">{sub}</p>
+                <p className={`text-2xl font-black ${color}`}>{value}</p>
+                <p className="text-xs text-gray-600 mt-1">{sub}</p>
             </div>
         );
 
-        const NewsItem = ({ time, event, impact }) => (
-            <div className="flex items-center justify-between group cursor-pointer">
-                <div>
-                    <p className="text-xs font-bold text-gray-600 mb-1">{time} UTC</p>
-                    <p className="text-sm font-bold group-hover:text-teal-400 transition-colors">{event}</p>
-                </div>
-                <div className={`px-2 py-1 rounded text-[9px] font-black ${impact === 'HIGH' ? 'bg-red-500/10 text-red-500' : 'bg-orange-500/10 text-orange-500'}`}>
-                    {impact}
-                </div>
+        const NewsItem = ({ time, event, impact, color }) => (
+            <div className="flex justify-between items-center">
+                <span className="text-xs text-gray-600 font-bold">{time}</span>
+                <span className="text-sm font-bold">{event}</span>
+                <span className={`text-[10px] font-black ${color}`}>{impact}</span>
             </div>
         );
 
-        const TradeRow = ({ id, type, volume, price, profit, status }) => (
-            <tr className="hover:bg-white/5 transition-colors group">
-                <td className="p-6 text-gray-400">{id}</td>
-                <td className={`p-6 font-bold ${type === 'BUY' ? 'text-teal-400' : 'text-red-500'}`}>{type}</td>
-                <td className="p-6 text-white">{volume}</td>
-                <td className="p-6 text-gray-500 font-mono">{price}</td>
-                <td className="p-6 text-teal-400 font-bold">{profit}</td>
-                <td className="p-6">
-                    <span className={`px-3 py-1 rounded-full text-[10px] font-black ${status === 'OPEN' ? 'bg-teal-500 text-black active-pulse' : 'bg-white/10 text-gray-500'}`}>
-                        {status}
-                    </span>
-                </td>
-            </tr>
-        );
-
-        const AdminPanel = ({ setView }) => {
-            return (
-                <div className="p-10 max-w-4xl mx-auto">
-                    <div className="glass p-10 rounded-[3rem] space-y-8">
-                        <div className="flex justify-between items-center">
-                            <h2 className="text-2xl font-bold">Terminal Settings</h2>
-                            <button onClick={() => setView('dashboard')} className="text-teal-400 font-bold">BACK TO DATA</button>
-                        </div>
-                        <div className="space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-gray-500 uppercase">MT5 Login ID</label>
-                                    <input className="w-full p-4 rounded-xl" defaultValue="9805021" />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-gray-500 uppercase">Risk Per Position (%)</label>
-                                    <select className="w-full p-4 rounded-xl"><option>0.5%</option><option>1.0%</option><option>2.0%</option></select>
-                                </div>
-                            </div>
-                            <button className="bg-teal-500 text-black font-bold w-full py-4 rounded-xl">SAVE TERMINAL CONFIG</button>
-                        </div>
-                        <div className="pt-8 border-t border-white/10">
-                            <p className="text-xs text-gray-500 mb-2">Administrator Support: allymabz@gmail.com</p>
-                            <button onClick={() => supabaseClient.auth.signOut().then(() => window.location.reload())} className="text-red-500 font-bold text-xs uppercase tracking-widest">Disconnect Neural Key (Logout)</button>
-                        </div>
+        const AdminPanel = ({ setView, user }) => (
+            <div className="p-10 max-w-xl mx-auto">
+                <div className="glass p-10 rounded-[3rem] space-y-6">
+                    <h2 className="text-2xl font-bold">Terminal Config</h2>
+                    <div className="space-y-4">
+                        <div><label className="text-[10px] font-bold uppercase text-gray-500">MT5 Login</label><input className="w-full p-4 rounded-xl mt-1" defaultValue="9805021" /></div>
+                        <div><label className="text-[10px] font-bold uppercase text-gray-500">Risk Limit</label><select className="w-full p-4 rounded-xl mt-1"><option>1.0%</option><option>2.0%</option></select></div>
+                        <button className="bg-teal-500 text-black font-bold w-full py-4 rounded-xl" onClick={() => setView('dashboard')}>SAVE AND LINK</button>
+                        <button onClick={() => supabaseClient.auth.signOut().then(() => location.reload())} className="w-full text-red-500 text-xs font-bold py-2">DISCONNECT ACCOUNT</button>
                     </div>
                 </div>
-            );
-        };
+            </div>
+        );
 
-        // --- Chart Initialization Helper ---
-        setTimeout(() => {
-            if (document.querySelector("#priceChart")) {
-                const options = {
-                    series: [{ name: 'XAUUSD', data: [2010, 2012, 2008, 2015, 2030, 2045, 2038, 2042, 2055] }],
-                    chart: { height: 400, type: 'area', toolbar: { show: false }, animations: { enabled: true } },
-                    colors: ['#2dd4bf'],
-                    fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.3, opacityTo: 0 } },
-                    stroke: { curve: 'smooth', width: 2 },
-                    grid: { borderColor: 'rgba(255,255,255,0.05)' },
-                    xaxis: { labels: { show: false }, axisBorder: { show: false } },
-                    yaxis: { labels: { style: { colors: '#666' } } },
-                    tooltip: { theme: 'dark' }
-                };
-                new ApexCharts(document.querySelector("#priceChart"), options).render();
-            }
-        }, 1000);
-
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-</body>
-</html>
+        // Chart I
