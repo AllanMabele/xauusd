@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>LiquidGold AI | Institutional XAUUSD Terminal</title>
 
-<!-- Dependencies -->
 <script src="https://cdn.tailwindcss.com"></script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -15,18 +14,14 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono&display=swap" rel="stylesheet" />
 
 <style>
-  :root {
-    --teal: #2dd4bf;
-    --black: #050505;
-    --card-bg: rgba(15, 15, 20, 0.8);
-  }
+  :root { --teal:#2dd4bf; --black:#050505; --card-bg:rgba(15,15,20,0.8); }
   body {
     background-color: var(--black);
     color: #fff;
     font-family: 'Space Grotesk', sans-serif;
     background-image:
-      radial-gradient(circle at 10% 20%, rgba(45, 212, 191, 0.06) 0%, transparent 40%),
-      radial-gradient(circle at 90% 80%, rgba(45, 212, 191, 0.04) 0%, transparent 40%);
+      radial-gradient(circle at 10% 20%, rgba(45,212,191,0.06) 0%, transparent 40%),
+      radial-gradient(circle at 90% 80%, rgba(45,212,191,0.04) 0%, transparent 40%);
     min-height: 100vh;
     overflow-x: hidden;
   }
@@ -34,37 +29,21 @@
     background: var(--card-bg);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
+    border: 1px solid rgba(255,255,255,0.08);
+    box-shadow: 0 8px 32px 0 rgba(0,0,0,0.8);
   }
-  .teal-glow { box-shadow: 0 0 25px rgba(45, 212, 191, 0.15); }
+  .teal-glow { box-shadow: 0 0 25px rgba(45,212,191,0.15); }
   .mono { font-family: 'JetBrains Mono', monospace; }
-  .status-pulse {
-    width: 10px; height: 10px; border-radius: 50%;
-    background: var(--teal); animation: pulse 2s infinite;
-  }
+  .status-pulse { width:10px; height:10px; border-radius:50%; background:var(--teal); animation:pulse 2s infinite; }
   .active-pulse { animation: activePulse 1.5s infinite; }
-  @keyframes pulse {
-    0%, 100% { transform: scale(0.9); opacity: 0.7; }
-    50%      { transform: scale(1.2); opacity: 1; }
-  }
-  @keyframes activePulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
-    50%      { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
-  }
-  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-  .animate-fade-in { animation: fadeIn 0.4s ease-out; }
-
-  input, select {
-    background: rgba(255, 255, 255, 0.05) !important;
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
-    color: #fff !important;
-  }
-  input:focus { border-color: var(--teal) !important; outline: none; }
-
-  /* Scrollbar */
-  ::-webkit-scrollbar { width: 8px; height: 8px; }
-  ::-webkit-scrollbar-thumb { background: rgba(45,212,191,0.2); border-radius: 4px; }
+  @keyframes pulse { 0%,100%{transform:scale(.9);opacity:.7} 50%{transform:scale(1.2);opacity:1} }
+  @keyframes activePulse { 0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.4)} 50%{box-shadow:0 0 0 10px rgba(239,68,68,0)} }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
+  .animate-fade-in { animation: fadeIn .4s ease-out; }
+  input, select { background:rgba(255,255,255,.05)!important; border:1px solid rgba(255,255,255,.1)!important; color:#fff!important; }
+  input:focus { border-color: var(--teal)!important; outline:none; }
+  ::-webkit-scrollbar { width:8px; height:8px; }
+  ::-webkit-scrollbar-thumb { background:rgba(45,212,191,.2); border-radius:4px; }
 </style>
 </head>
 <body>
@@ -74,16 +53,36 @@
 <script type="text/babel" data-presets="react">
 const { useState, useEffect, useMemo, useRef, useCallback } = React;
 
-/* ==============================
-   SUPABASE CONFIG
-================================= */
+/* ========== SUPABASE ========== */
 const SUPABASE_URL = "https://zqyextmqqlgyfmttuull.supabase.co";
 const SUPABASE_KEY = "sb_publishable_h83sBB7QFQwxHCspfgVXtw_byGUWSfd";
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-/* ==============================
-   APP ENTRY
-================================= */
+/* ========== LIVE GOLD PRICE FEED ==========
+   Primary: gold-api.com (free, no key, ~spot price same as TradingView XAUUSD)
+   Fallback: Yahoo Finance XAUUSD=X via a CORS proxy
+   Polling every 3s — TradingView itself does not expose a public API.
+*/
+async function fetchLiveGold() {
+  try {
+    const r = await fetch("https://api.gold-api.com/price/XAU");
+    if (r.ok) {
+      const j = await r.json();
+      if (j && j.price) return Number(j.price);
+    }
+  } catch (e) {}
+  try {
+    const url = "https://query1.finance.yahoo.com/v8/finance/chart/XAUUSD=X?interval=1m&range=1d";
+    const proxy = "https://corsproxy.io/?" + encodeURIComponent(url);
+    const r = await fetch(proxy);
+    const j = await r.json();
+    const p = j?.chart?.result?.[0]?.meta?.regularMarketPrice;
+    if (p) return Number(p);
+  } catch (e) {}
+  return null;
+}
+
+/* ========== APP ========== */
 const App = () => {
   const [view, setView] = useState("auth");
   const [user, setUser] = useState(null);
@@ -91,32 +90,17 @@ const App = () => {
 
   useEffect(() => {
     let mounted = true;
-
-    // Set listener BEFORE getSession (best practice)
-    const { data: authListener } = supabaseClient.auth.onAuthStateChange((_event, session) => {
+    const { data: authListener } = supabaseClient.auth.onAuthStateChange((_e, session) => {
       if (!mounted) return;
-      if (session) {
-        setUser(session.user);
-        setView("dashboard");
-      } else {
-        setUser(null);
-        setView("auth");
-      }
+      if (session) { setUser(session.user); setView("dashboard"); }
+      else { setUser(null); setView("auth"); }
     });
-
     supabaseClient.auth.getSession().then(({ data }) => {
       if (!mounted) return;
-      if (data?.session) {
-        setUser(data.session.user);
-        setView("dashboard");
-      }
+      if (data?.session) { setUser(data.session.user); setView("dashboard"); }
       setLoading(false);
     });
-
-    return () => {
-      mounted = false;
-      authListener.subscription.unsubscribe();
-    };
+    return () => { mounted = false; authListener.subscription.unsubscribe(); };
   }, []);
 
   if (loading) {
@@ -127,7 +111,6 @@ const App = () => {
       </div>
     );
   }
-
   return (
     <div className="animate-fade-in">
       {view === "auth" ? <AuthPage /> : <Dashboard user={user} />}
@@ -135,9 +118,7 @@ const App = () => {
   );
 };
 
-/* ==============================
-   AUTH PAGE
-================================= */
+/* ========== AUTH ========== */
 const AuthPage = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -148,28 +129,16 @@ const AuthPage = () => {
   const handleAuth = async (e) => {
     e?.preventDefault();
     setError("");
-    if (!email || !password) {
-      setError("Email and password are required");
-      return;
-    }
+    if (!email || !password) return setError("Email and password are required");
     try {
       setLoading(true);
-      const response = register
-        ? await supabaseClient.auth.signUp({
-            email,
-            password,
-            options: { emailRedirectTo: window.location.origin },
-          })
+      const res = register
+        ? await supabaseClient.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin } })
         : await supabaseClient.auth.signInWithPassword({ email, password });
-      if (response.error) setError(response.error.message);
-      else if (register && !response.data.session) {
-        setError("Check your email to confirm your account.");
-      }
-    } catch (err) {
-      setError(err.message || "Unknown error");
-    } finally {
-      setLoading(false);
-    }
+      if (res.error) setError(res.error.message);
+      else if (register && !res.data.session) setError("Check your email to confirm your account.");
+    } catch (err) { setError(err.message || "Unknown error"); }
+    finally { setLoading(false); }
   };
 
   return (
@@ -186,46 +155,29 @@ const AuthPage = () => {
         <div className="space-y-4 text-left">
           <div className="space-y-1">
             <label className="text-[10px] font-bold text-gray-500 uppercase ml-2">Node ID (Email)</label>
-            <input
-              type="email"
-              className="w-full p-4 rounded-xl outline-none"
-              placeholder="name@firm.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              autoComplete="email"
-            />
+            <input type="email" className="w-full p-4 rounded-xl outline-none" placeholder="name@firm.com"
+              value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
           </div>
           <div className="space-y-1">
             <label className="text-[10px] font-bold text-gray-500 uppercase ml-2">Secure Key</label>
-            <input
-              type="password"
-              className="w-full p-4 rounded-xl outline-none"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete={register ? "new-password" : "current-password"}
-            />
+            <input type="password" className="w-full p-4 rounded-xl outline-none" placeholder="••••••••"
+              value={password} onChange={(e) => setPassword(e.target.value)}
+              autoComplete={register ? "new-password" : "current-password"} />
           </div>
 
           {error && (
-            <div className="text-red-400 text-xs bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+            <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-xs p-3 rounded-xl">
               {error}
             </div>
           )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-teal-500 text-black py-4 rounded-xl font-black uppercase tracking-widest text-sm hover:bg-teal-400 transition disabled:opacity-50"
-          >
+          <button type="submit" disabled={loading}
+            className="w-full bg-teal-500 text-black font-black tracking-widest py-4 rounded-xl uppercase text-sm hover:bg-teal-400 transition disabled:opacity-50">
             {loading ? "ESTABLISHING..." : register ? "INITIALIZE ACCOUNT" : "ESTABLISH LINK"}
           </button>
 
-          <button
-            type="button"
-            onClick={() => { setRegister(!register); setError(""); }}
-            className="w-full text-gray-500 text-xs uppercase tracking-widest mt-2 hover:text-teal-400 transition"
-          >
+          <button type="button" onClick={() => { setRegister(!register); setError(""); }}
+            className="w-full text-gray-500 text-xs uppercase tracking-widest mt-2 hover:text-teal-400 transition">
             {register ? "Existing Node? Sign In" : "Request Institutional Access"}
           </button>
         </div>
@@ -234,35 +186,38 @@ const AuthPage = () => {
   );
 };
 
-/* ==============================
-   DASHBOARD
-================================= */
+/* ========== DASHBOARD ========== */
 const Dashboard = ({ user }) => {
   const [trades, setTrades] = useState([]);
   const [botActive, setBotActive] = useState(false);
-  const [goldPrice, setGoldPrice] = useState(2345.5);
+  const [goldPrice, setGoldPrice] = useState(null);
+  const [priceSource, setPriceSource] = useState("…");
   const [loadError, setLoadError] = useState("");
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
 
   const fetchTrades = useCallback(async () => {
     const { data, error } = await supabaseClient
-      .from("trades")
-      .select("*")
-      .order("created_at", { ascending: false });
+      .from("trades").select("*").order("created_at", { ascending: false });
     if (error) setLoadError(error.message);
     else { setLoadError(""); setTrades(data || []); }
   }, []);
 
-  // Price simulation
+  /* LIVE PRICE POLLING */
   useEffect(() => {
-    const interval = setInterval(() => {
-      setGoldPrice((prev) => Number((prev + (Math.random() - 0.5) * 1.5).toFixed(2)));
-    }, 2000);
-    return () => clearInterval(interval);
+    let alive = true;
+    const tick = async () => {
+      const p = await fetchLiveGold();
+      if (!alive) return;
+      if (p) { setGoldPrice(p); setPriceSource("LIVE"); }
+      else setPriceSource("OFFLINE");
+    };
+    tick();
+    const id = setInterval(tick, 3000);
+    return () => { alive = false; clearInterval(id); };
   }, []);
 
-  // Realtime trades
+  /* REALTIME TRADES */
   useEffect(() => {
     fetchTrades();
     const channel = supabaseClient
@@ -272,15 +227,13 @@ const Dashboard = ({ user }) => {
     return () => { supabaseClient.removeChannel(channel); };
   }, [fetchTrades]);
 
-  // Chart init
+  /* CHART */
   useEffect(() => {
     if (!chartRef.current) return;
-    const options = {
-      chart: {
-        type: "area", height: 350, background: "transparent",
+    chartInstance.current = new ApexCharts(chartRef.current, {
+      chart: { type: "area", height: 350, background: "transparent",
         toolbar: { show: false },
-        animations: { enabled: true, easing: "linear", dynamicAnimation: { speed: 1000 } },
-      },
+        animations: { enabled: true, easing: "linear", dynamicAnimation: { speed: 1000 } } },
       theme: { mode: "dark" },
       series: [{ name: "XAUUSD", data: [] }],
       colors: ["#2dd4bf"],
@@ -290,29 +243,25 @@ const Dashboard = ({ user }) => {
       xaxis: { labels: { show: false }, axisBorder: { show: false }, axisTicks: { show: false } },
       yaxis: { labels: { style: { colors: "#666", fontFamily: "JetBrains Mono" } } },
       tooltip: { theme: "dark" },
-    };
-    chartInstance.current = new ApexCharts(chartRef.current, options);
+    });
     chartInstance.current.render();
     return () => chartInstance.current && chartInstance.current.destroy();
   }, []);
 
-  // Push price into chart
   useEffect(() => {
-    if (!chartInstance.current) return;
+    if (!chartInstance.current || goldPrice == null) return;
     const existing = chartInstance.current.w.config.series[0].data || [];
-    const updated = [...existing, goldPrice].slice(-30);
+    const updated = [...existing, goldPrice].slice(-60);
     chartInstance.current.updateSeries([{ name: "XAUUSD", data: updated }]);
   }, [goldPrice]);
 
   const createTrade = async (type) => {
     if (!botActive) return alert("System Offline: Activate Neural Engine First");
+    if (goldPrice == null) return alert("No live price yet");
     const entry = goldPrice;
     const dir = type === "BUY" ? 1 : -1;
     const positions = [1, 2, 3].map((i) => ({
-      user_id: user.id,
-      type,
-      symbol: "XAUUSD",
-      lots: 0.5,
+      user_id: user.id, type, symbol: "XAUUSD", lots: 0.5,
       entry_price: entry,
       tp: entry + dir * (i === 3 ? 50 : 20),
       sl: entry - dir * 10,
@@ -324,88 +273,69 @@ const Dashboard = ({ user }) => {
 
   const settleTrade = async (id) => {
     const profit = (Math.random() * 1000 - 200).toFixed(2);
-    const { error } = await supabaseClient
-      .from("trades")
-      .update({ status: "CLOSED", profit })
-      .eq("id", id);
+    const { error } = await supabaseClient.from("trades")
+      .update({ status: "CLOSED", profit }).eq("id", id);
     if (error) alert(error.message);
   };
 
   const openCount = useMemo(() => trades.filter((t) => t.status === "OPEN").length, [trades]);
   const totalProfit = useMemo(
-    () => trades.reduce((acc, t) => acc + parseFloat(t.profit || 0), 0),
-    [trades]
-  );
+    () => trades.reduce((acc, t) => acc + parseFloat(t.profit || 0), 0), [trades]);
 
   return (
-    <div className="max-w-7xl mx-auto p-5 md:p-8 space-y-6">
+    <div className="max-w-7xl mx-auto p-6 space-y-6">
       {/* Header */}
-      <div className="glass rounded-2xl p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className="glass rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <div className="bg-teal-500/10 w-12 h-12 rounded-xl flex items-center justify-center border border-teal-500/20">
             <i className="fas fa-bolt text-teal-400 text-xl"></i>
           </div>
           <div>
-            <h1 className="text-xl font-bold tracking-tighter">
-              LIQUID<span className="text-teal-400">GOLD</span> AI
-            </h1>
-            <p className="text-[10px] text-gray-500 uppercase tracking-widest mono">{user?.email}</p>
+            <h1 className="text-xl font-bold tracking-tight">LIQUIDGOLD AI</h1>
+            <p className="text-[10px] text-gray-500 uppercase tracking-widest">{user?.email}</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-2 bg-white/5 px-3 py-2 rounded-xl border border-white/5">
-            <span className="status-pulse"></span>
-            <span className="text-[10px] uppercase tracking-widest text-gray-400">Neural Link Active</span>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 text-xs text-gray-400 mr-2">
+            <span className="status-pulse"></span> Neural Link {priceSource}
           </div>
-          <button
-            onClick={() => setBotActive(!botActive)}
+          <button onClick={() => setBotActive(!botActive)}
             className={`px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${
               botActive
                 ? "bg-red-500/10 text-red-500 border border-red-500/50 active-pulse"
                 : "bg-teal-500 text-black hover:bg-teal-400"
-            }`}
-          >
+            }`}>
             {botActive ? "TERMINATE ENGINE" : "ACTIVATE ENGINE"}
           </button>
-          <button
-            onClick={() => supabaseClient.auth.signOut()}
-            className="px-4 py-2.5 rounded-xl text-xs uppercase tracking-widest text-gray-400 border border-white/10 hover:bg-white/5"
-          >
-            <i className="fas fa-sign-out-alt mr-2"></i>Logout
+          <button onClick={() => supabaseClient.auth.signOut()}
+            className="px-4 py-2.5 rounded-xl text-xs uppercase tracking-widest text-gray-400 border border-white/10 hover:bg-white/5">
+            Logout
           </button>
         </div>
       </div>
 
-      {/* Stat cards */}
+      {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard label="XAUUSD" value={`$${goldPrice.toFixed(2)}`} sub="Live Spot" color="text-teal-400" />
-        <StatCard label="Positions" value={openCount} sub="Open Positions" color="text-white" />
-        <StatCard
-          label="Net P/L"
-          value={`$${totalProfit.toFixed(2)}`}
-          sub="Realized"
-          color={totalProfit >= 0 ? "text-teal-400" : "text-red-500"}
-        />
-        <StatCard label="Engine" value={botActive ? "ONLINE" : "OFFLINE"} sub="Neural Status" color={botActive ? "text-teal-400" : "text-gray-500"} />
+        <StatCard label="XAUUSD Spot" value={goldPrice != null ? `$${goldPrice.toFixed(2)}` : "—"} sub={priceSource} color="text-teal-400" />
+        <StatCard label="Open Positions" value={openCount} sub="LIVE" color="text-white" />
+        <StatCard label="Net P/L" value={`$${totalProfit.toFixed(2)}`} sub="SESSION"
+          color={totalProfit >= 0 ? "text-teal-400" : "text-red-500"} />
+        <StatCard label="Total Records" value={trades.length} sub="ALL TIME" color="text-white" />
       </div>
 
       {/* Chart + Bias */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 glass rounded-2xl p-5">
-          <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-            <h2 className="text-sm uppercase tracking-widest text-gray-400">Neural Price Map</h2>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => createTrade("BUY")}
-                className="bg-teal-500/10 text-teal-500 px-6 py-2 rounded-xl text-xs font-black border border-teal-500/20 hover:bg-teal-500 hover:text-black transition"
-              >
+      <div className="grid lg:grid-cols-3 gap-4">
+        <div className="glass rounded-2xl p-5 lg:col-span-2">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-bold uppercase tracking-widest">Neural Price Map</h2>
+            <div className="flex gap-2">
+              <button onClick={() => createTrade("BUY")}
+                className="bg-teal-500/10 text-teal-500 px-6 py-2 rounded-xl text-xs font-black border border-teal-500/20 hover:bg-teal-500 hover:text-black transition">
                 BUY
               </button>
-              <button
-                onClick={() => createTrade("SELL")}
-                className="bg-red-500/10 text-red-500 px-6 py-2 rounded-xl text-xs font-black border border-red-500/20 hover:bg-red-500 hover:text-white transition"
-              >
+              <button onClick={() => createTrade("SELL")}
+                className="bg-red-500/10 text-red-500 px-6 py-2 rounded-xl text-xs font-black border border-red-500/20 hover:bg-red-500 hover:text-white transition">
                 SELL
               </button>
             </div>
@@ -413,75 +343,69 @@ const Dashboard = ({ user }) => {
           <div ref={chartRef}></div>
         </div>
 
-        <div className="glass rounded-2xl p-5 flex flex-col justify-between">
-          <div>
-            <h2 className="text-sm uppercase tracking-widest text-gray-400 mb-4">Market Bias</h2>
-            <p className="text-3xl font-black text-teal-400 tracking-tighter mb-6">BULLISH BOS</p>
-            <div className="space-y-3 text-xs">
-              <BiasRow label="D1 Alignment" value="STABLE" />
-              <BiasRow label="H4 Structure" value="ALIGNED" />
+        <div className="glass rounded-2xl p-5">
+          <div className="space-y-3">
+            <h2 className="text-sm font-bold uppercase tracking-widest">Market Bias</h2>
+            <p className="text-2xl font-black text-teal-400">BULLISH BOS</p>
+            <div className="space-y-2 mt-4">
+              <BiasRow label="Trend" value="UP" />
+              <BiasRow label="Liquidity" value="BUY-SIDE" />
               <BiasRow label="Session" value="LONDON" />
-              <BiasRow label="Volatility" value="MEDIUM" />
+              <BiasRow label="Volatility" value="HIGH" />
             </div>
           </div>
-          <p className="text-[10px] text-gray-600 mt-6 mono">Updated {new Date().toLocaleTimeString()}</p>
+          <p className="text-[10px] text-gray-500 mt-6 uppercase tracking-widest">
+            Updated {new Date().toLocaleTimeString()}
+          </p>
         </div>
       </div>
 
       {/* Execution log */}
       <div className="glass rounded-2xl p-5">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm uppercase tracking-widest text-gray-400">Execution Log</h2>
-          <span className="text-[10px] text-gray-600 mono">{trades.length} RECORDS</span>
+          <h2 className="text-sm font-bold uppercase tracking-widest">Execution Log</h2>
+          <span className="text-[10px] text-gray-500">{trades.length} RECORDS</span>
         </div>
 
         {loadError && (
-          <div className="text-red-400 text-xs bg-red-500/10 border border-red-500/30 rounded-lg p-3 mb-4">
+          <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-xs p-3 rounded-xl mb-3">
             {loadError}
           </div>
         )}
 
         <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="text-[10px] uppercase tracking-widest text-gray-500 border-b border-white/5">
-                <th className="text-left py-3 px-2">Asset</th>
-                <th className="text-left py-3 px-2">Type</th>
-                <th className="text-left py-3 px-2">Lots</th>
-                <th className="text-left py-3 px-2">Price</th>
-                <th className="text-left py-3 px-2">Profit</th>
-                <th className="text-left py-3 px-2">Execution</th>
+          <table className="w-full text-xs mono">
+            <thead className="text-gray-500 uppercase tracking-widest">
+              <tr className="text-left">
+                <th className="py-2">Asset</th>
+                <th>Type</th>
+                <th>Lots</th>
+                <th>Price</th>
+                <th>Profit</th>
+                <th>Execution</th>
               </tr>
             </thead>
             <tbody>
               {trades.length === 0 ? (
-                <tr>
-                  <td colSpan="6" className="text-center text-gray-600 py-8 text-xs uppercase tracking-widest">
-                    No executions logged
-                  </td>
-                </tr>
+                <tr><td colSpan="6" className="text-center py-8 text-gray-600">No executions logged</td></tr>
               ) : (
                 trades.map((t) => (
-                  <tr key={t.id} className="border-b border-white/5 hover:bg-white/5 transition">
-                    <td className="py-3 px-2 font-bold mono">{t.symbol}</td>
-                    <td className={`py-3 px-2 font-black ${t.type === "BUY" ? "text-teal-400" : "text-red-500"}`}>
-                      {t.type}
-                    </td>
-                    <td className="py-3 px-2 mono">{t.lots}</td>
-                    <td className="py-3 px-2 mono">{t.entry_price}</td>
-                    <td className={`py-3 px-2 mono font-bold ${parseFloat(t.profit || 0) >= 0 ? "text-teal-400" : "text-red-500"}`}>
+                  <tr key={t.id} className="border-t border-white/5">
+                    <td className="py-3">{t.symbol}</td>
+                    <td className={t.type === "BUY" ? "text-teal-400" : "text-red-500"}>{t.type}</td>
+                    <td>{t.lots}</td>
+                    <td>{t.entry_price}</td>
+                    <td className={parseFloat(t.profit || 0) >= 0 ? "text-teal-400" : "text-red-500"}>
                       ${parseFloat(t.profit || 0).toFixed(2)}
                     </td>
-                    <td className="py-3 px-2">
+                    <td>
                       {t.status === "OPEN" ? (
-                        <button
-                          onClick={() => settleTrade(t.id)}
-                          className="bg-teal-500/10 text-teal-500 border border-teal-500/30 px-4 py-1.5 rounded-lg text-[9px] font-black hover:bg-teal-500 hover:text-black transition"
-                        >
+                        <button onClick={() => settleTrade(t.id)}
+                          className="bg-teal-500/10 text-teal-500 border border-teal-500/30 px-4 py-1.5 rounded-lg text-[9px] font-black hover:bg-teal-500 hover:text-black transition">
                           SETTLE
                         </button>
                       ) : (
-                        <span className="text-[9px] font-black text-gray-500 uppercase">CLOSED</span>
+                        <span className="text-gray-500">CLOSED</span>
                       )}
                     </td>
                   </tr>
@@ -497,16 +421,16 @@ const Dashboard = ({ user }) => {
 
 const StatCard = ({ label, value, sub, color }) => (
   <div className="glass rounded-2xl p-5">
-    <p className="text-[10px] uppercase tracking-widest text-gray-500 mb-2">{label}</p>
-    <p className={`text-2xl font-black mono ${color}`}>{value}</p>
-    <p className="text-[10px] text-gray-600 mt-1">{sub}</p>
+    <p className="text-[10px] text-gray-500 uppercase tracking-widest">{label}</p>
+    <p className={`text-2xl font-black mt-2 mono ${color}`}>{value}</p>
+    <p className="text-[10px] text-gray-600 uppercase tracking-widest mt-1">{sub}</p>
   </div>
 );
 
 const BiasRow = ({ label, value }) => (
-  <div className="flex justify-between items-center border-b border-white/5 pb-2">
-    <span className="text-gray-500 uppercase tracking-widest text-[10px]">{label}</span>
-    <span className="text-teal-400 font-bold mono text-[11px]">{value}</span>
+  <div className="flex justify-between text-xs border-b border-white/5 pb-2">
+    <span className="text-gray-500 uppercase tracking-widest">{label}</span>
+    <span className="text-white font-bold mono">{value}</span>
   </div>
 );
 
@@ -514,5 +438,5 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 </script>
 </body>
 </html>
-liquidgold-ai.html
-Displaying liquidgold-ai.html.
+liquidgold-ai (1).html
+Displaying liquidgold-ai (1).html.
