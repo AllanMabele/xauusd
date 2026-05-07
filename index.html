@@ -202,3 +202,112 @@
                 const positions = [
                     { user_id:user.id, type, symbol:"XAUUSD", lots:0.5, entry_price:entry, tp:entry + 20, sl:entry - 10, status: 'OPEN' },
                     { user_id:user.id, type, symbol:"XAUUSD", lots:0.5, entry_price:entry, tp:entry + 20, sl:entry - 10, status: 'OPEN' },
+                    { user_id:user.id, type, symbol:"XAUUSD", lots:0.5, entry_price:entry, tp:entry + 50, sl:entry - 10, status: 'OPEN' }
+                ];
+                const { error } = await supabaseClient.from("trades").insert(positions);
+                if(error) alert(error.message);
+            };
+
+            const settleTrade = async (id) => {
+                await supabaseClient.from("trades").update({ status: 'CLOSED', profit: (Math.random() * 500).toFixed(2) }).eq('id', id);
+                fetchTrades();
+            };
+
+            const totalProfit = useMemo(() => trades.reduce((acc, t) => acc + parseFloat(t.profit || 0), 0), [trades]);
+
+            return (
+                <div className="max-w-[1600px] mx-auto p-4 lg:p-8 space-y-6">
+                    <nav className="glass rounded-3xl p-6 flex justify-between items-center border border-white/5 teal-glow">
+                        <div className="flex items-center gap-4">
+                            <div className="h-10 w-10 bg-teal-500 rounded-xl flex items-center justify-center shadow-lg shadow-teal-500/40 text-black">
+                                <i className="fas fa-wave-square"></i>
+                            </div>
+                            <h2 className="text-xl font-bold tracking-tighter">LIQUID<span className="text-teal-400">GOLD</span> AI</h2>
+                        </div>
+                        <div className="flex items-center gap-6">
+                            <div className="hidden md:flex items-center gap-3">
+                                <div className="status-pulse"></div>
+                                <span className="text-[10px] font-black text-teal-400 uppercase tracking-widest">Neural Link Active</span>
+                            </div>
+                            <button onClick={()=>setBotActive(!botActive)} className={`px-8 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${botActive ? 'bg-red-500/10 text-red-500 border border-red-500/50 active-pulse' : 'bg-teal-500 text-black'}`}>
+                                {botActive ? 'TERMINATE ENGINE' : 'ACTIVATE ENGINE'}
+                            </button>
+                            <i className="fas fa-sign-out-alt text-gray-500 cursor-pointer hover:text-white" onClick={()=>supabaseClient.auth.signOut()}></i>
+                        </div>
+                    </nav>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <StatCard label="Live Gold Price" value={`$${goldPrice}`} sub="Real-time Simulation" color="text-teal-400" />
+                        <StatCard label="Active Nodes" value={trades.filter(t => t.status === 'OPEN').length} sub="Open Positions" color="text-white" />
+                        <StatCard label="Net Realized" value={`+$${totalProfit.toLocaleString()}`} sub="Total Settled" color="text-teal-400" />
+                        <StatCard label="Node Status" value={botActive ? "ACTIVE" : "STANDBY"} sub="Neural Engine" color="text-white" />
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                        <div className="lg:col-span-8 glass rounded-[2.5rem] p-8 border border-white/5">
+                            <div className="flex justify-between items-center mb-8">
+                                <h3 className="font-bold text-lg">Neural Price Map</h3>
+                                <div className="flex gap-2">
+                                    <button onClick={()=>createTrade("BUY")} className="bg-teal-500/10 text-teal-500 px-6 py-2 rounded-xl text-xs font-black border border-teal-500/20 hover:bg-teal-500 hover:text-black">BUY</button>
+                                    <button onClick={()=>createTrade("SELL")} className="bg-red-500/10 text-red-500 px-6 py-2 rounded-xl text-xs font-black border border-red-500/20 hover:bg-red-500 hover:text-white">SELL</button>
+                                </div>
+                            </div>
+                            <div ref={chartRef}></div>
+                        </div>
+
+                        <div className="lg:col-span-4 space-y-6">
+                            <div className="glass rounded-[2rem] p-8 border border-teal-500/20 h-full">
+                                <h4 className="text-gray-500 text-[10px] font-black uppercase tracking-widest mb-4">Market Bias</h4>
+                                <p className="text-4xl font-black text-teal-400 tracking-tighter">BULLISH BOS</p>
+                                <div className="mt-8 space-y-4">
+                                    <div className="flex justify-between text-xs font-bold uppercase tracking-wider"><span>D1 Alignment:</span><span className="text-teal-400">STABLE</span></div>
+                                    <div className="flex justify-between text-xs font-bold uppercase tracking-wider"><span>H4 Structure:</span><span className="text-teal-400">ALIGNED</span></div>
+                                    <div className="flex justify-between text-xs font-bold uppercase tracking-wider"><span>Session:</span><span className="text-white">LONDON</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="glass rounded-[2.5rem] overflow-hidden border border-white/5">
+                        <div className="p-8 border-b border-white/5 font-bold uppercase text-xs tracking-widest text-gray-500">Execution Log</div>
+                        <table className="w-full text-left">
+                            <thead className="bg-white/5 text-[10px] font-black uppercase text-gray-500 tracking-widest">
+                                <tr>
+                                    <th className="p-6">Asset</th><th className="p-6">Type</th><th className="p-6">Lots</th><th className="p-6">Price</th><th className="p-6">Profit</th><th className="p-6">Execution</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-white/5 mono text-xs">
+                                {trades.map(t => (
+                                    <tr key={t.id} className="hover:bg-white/5 transition-colors">
+                                        <td className="p-6 font-bold text-white">{t.symbol}</td>
+                                        <td className={`p-6 font-bold ${t.type === 'BUY' ? 'text-teal-400' : 'text-red-500'}`}>{t.type}</td>
+                                        <td className="p-6 text-gray-400">{t.lots}</td>
+                                        <td className="p-6 text-gray-600">{t.entry_price}</td>
+                                        <td className={`p-6 font-bold ${parseFloat(t.profit) >= 0 ? 'text-teal-400' : 'text-red-500'}`}>${t.profit}</td>
+                                        <td className="p-6">
+                                            {t.status === 'OPEN' ? 
+                                                <button onClick={()=>settleTrade(t.id)} className="bg-teal-500/10 text-teal-500 border border-teal-500/30 px-4 py-1.5 rounded-lg text-[9px] font-black hover:bg-teal-500 hover:text-black">SETTLE</button> :
+                                                <span className="text-gray-700 font-black italic">CLOSED</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+        };
+
+        const StatCard = ({ label, value, sub, color }) => (
+            <div className="glass p-6 rounded-3xl hover:border-teal-500/40 transition-all cursor-pointer">
+                <p className="text-gray-500 text-[10px] font-black uppercase tracking-[0.2em] mb-2">{label}</p>
+                <p className={`text-3xl font-black ${color} tracking-tighter mb-1`}>{value}</p>
+                <p className="text-[10px] text-gray-600 font-bold uppercase">{sub}</p>
+            </div>
+        );
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>
