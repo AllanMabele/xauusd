@@ -35,15 +35,14 @@
   .teal-glow { box-shadow: 0 0 25px rgba(45,212,191,0.15); }
   .mono { font-family: 'JetBrains Mono', monospace; }
   .status-pulse { width:10px; height:10px; border-radius:50%; background:var(--teal); animation:pulse 2s infinite; }
-  .active-pulse { animation: activePulse 1.5s infinite; }
   @keyframes pulse { 0%,100%{transform:scale(.9);opacity:.7} 50%{transform:scale(1.2);opacity:1} }
-  @keyframes activePulse { 0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.4)} 50%{box-shadow:0 0 0 10px rgba(239,68,68,0)} }
   @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
   .animate-fade-in { animation: fadeIn .4s ease-out; }
-  input, select { background:rgba(255,255,255,.05)!important; border:1px solid rgba(255,255,255,.1)!important; color:#fff!important; }
-  input:focus { border-color: var(--teal)!important; outline:none; }
+  input, select, textarea { background:rgba(255,255,255,.05)!important; border:1px solid rgba(255,255,255,.1)!important; color:#fff!important; }
+  input:focus, textarea:focus { border-color: var(--teal)!important; outline:none; }
   ::-webkit-scrollbar { width:8px; height:8px; }
   ::-webkit-scrollbar-thumb { background:rgba(45,212,191,.2); border-radius:4px; }
+  .modal-bg { background: rgba(0,0,0,.85); backdrop-filter: blur(8px); }
 </style>
 </head>
 <body>
@@ -51,40 +50,41 @@
 
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script type="text/babel" data-presets="react">
-const { useState, useEffect, useMemo, useRef, useCallback } = React;
+const { useState, useEffect, useMemo, useCallback } = React;
 
-/* ========== SUPABASE ========== */
+/* ========== CONFIG ========== */
 const SUPABASE_URL = "https://zqyextmqqlgyfmttuull.supabase.co";
 const SUPABASE_KEY = "sb_publishable_h83sBB7QFQwxHCspfgVXtw_byGUWSfd";
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-/* ========== LIVE GOLD PRICE FEED ==========
-   Primary: gold-api.com (free, no key, ~spot price same as TradingView XAUUSD)
-   Fallback: Yahoo Finance XAUUSD=X via a CORS proxy
-   Polling every 3s — TradingView itself does not expose a public API.
-*/
-async function fetchLiveGold() {
-  try {
-    const r = await fetch("https://api.gold-api.com/price/XAU");
-    if (r.ok) {
-      const j = await r.json();
-      if (j && j.price) return Number(j.price);
-    }
-  } catch (e) {}
-  try {
-    const url = "https://query1.finance.yahoo.com/v8/finance/chart/XAUUSD=X?interval=1m&range=1d";
-    const proxy = "https://corsproxy.io/?" + encodeURIComponent(url);
-    const r = await fetch(proxy);
-    const j = await r.json();
-    const p = j?.chart?.result?.[0]?.meta?.regularMarketPrice;
-    if (p) return Number(p);
-  } catch (e) {}
-  return null;
-}
+const TELEGRAM_ADMIN = "LiquidM_Admin"; // alerts target
+const MPESA_NUMBER = "0701540201";
+const USDT_TRC20 = "TBr4ZsJky3ufBaA6WMFVJ7hX36Wtf29NRz";
+const STORAGE_BUCKET = "ea-files";
+
+const PRODUCTS = [
+  {
+    id: "liquidgold-institutional",
+    name: "LiquidGold AI — Institutional",
+    file: "LiquidGoldAI.mq5",
+    price: 100,
+    desc: "Multi-timeframe SMC engine (D1 / H4 / M15) with adaptive AI confidence scoring, triple-position bundles, dynamic trailing runner, news filter, and on-chart dashboard.",
+    tag: "INSTITUTIONAL",
+    icon: "fa-bolt"
+  },
+  {
+    id: "liquidgold-scalper",
+    name: "LiquidGold AI — M15 Scalper",
+    file: "LiquidGoldAI_Scalper.mq5",
+    price: 100,
+    desc: "M15 scalper aligned with H4 trend. 50% risk per trade, breakeven at +40 pips, auto-exit on opposite M15 close. Live entry-condition dashboard.",
+    tag: "SCALPER",
+    icon: "fa-rocket"
+  }
+];
 
 /* ========== APP ========== */
 const App = () => {
-  const [view, setView] = useState("auth");
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -92,12 +92,11 @@ const App = () => {
     let mounted = true;
     const { data: authListener } = supabaseClient.auth.onAuthStateChange((_e, session) => {
       if (!mounted) return;
-      if (session) { setUser(session.user); setView("dashboard"); }
-      else { setUser(null); setView("auth"); }
+      setUser(session?.user || null);
     });
     supabaseClient.auth.getSession().then(({ data }) => {
       if (!mounted) return;
-      if (data?.session) { setUser(data.session.user); setView("dashboard"); }
+      setUser(data?.session?.user || null);
       setLoading(false);
     });
     return () => { mounted = false; authListener.subscription.unsubscribe(); };
@@ -111,11 +110,7 @@ const App = () => {
       </div>
     );
   }
-  return (
-    <div className="animate-fade-in">
-      {view === "auth" ? <AuthPage /> : <Dashboard user={user} />}
-    </div>
-  );
+  return <div className="animate-fade-in">{user ? <Dashboard user={user} /> : <AuthPage />}</div>;
 };
 
 /* ========== AUTH ========== */
@@ -125,10 +120,11 @@ const AuthPage = () => {
   const [register, setRegister] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
 
   const handleAuth = async (e) => {
     e?.preventDefault();
-    setError("");
+    setError(""); setInfo("");
     if (!email || !password) return setError("Email and password are required");
     try {
       setLoading(true);
@@ -136,7 +132,7 @@ const AuthPage = () => {
         ? await supabaseClient.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin } })
         : await supabaseClient.auth.signInWithPassword({ email, password });
       if (res.error) setError(res.error.message);
-      else if (register && !res.data.session) setError("Check your email to confirm your account.");
+      else if (register && !res.data.session) setInfo("Check your email to confirm your account.");
     } catch (err) { setError(err.message || "Unknown error"); }
     finally { setLoading(false); }
   };
@@ -165,18 +161,14 @@ const AuthPage = () => {
               autoComplete={register ? "new-password" : "current-password"} />
           </div>
 
-          {error && (
-            <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-xs p-3 rounded-xl">
-              {error}
-            </div>
-          )}
+          {error && <div className="text-red-400 text-xs bg-red-500/10 border border-red-500/20 rounded-lg p-3">{error}</div>}
+          {info && <div className="text-teal-400 text-xs bg-teal-500/10 border border-teal-500/20 rounded-lg p-3">{info}</div>}
 
           <button type="submit" disabled={loading}
-            className="w-full bg-teal-500 text-black font-black tracking-widest py-4 rounded-xl uppercase text-sm hover:bg-teal-400 transition disabled:opacity-50">
+            className="w-full bg-teal-500 text-black font-black py-4 rounded-xl uppercase tracking-widest text-sm hover:bg-teal-400 disabled:opacity-50 transition">
             {loading ? "ESTABLISHING..." : register ? "INITIALIZE ACCOUNT" : "ESTABLISH LINK"}
           </button>
-
-          <button type="button" onClick={() => { setRegister(!register); setError(""); }}
+          <button type="button" onClick={() => { setRegister(!register); setError(""); setInfo(""); }}
             className="w-full text-gray-500 text-xs uppercase tracking-widest mt-2 hover:text-teal-400 transition">
             {register ? "Existing Node? Sign In" : "Request Institutional Access"}
           </button>
@@ -188,255 +180,338 @@ const AuthPage = () => {
 
 /* ========== DASHBOARD ========== */
 const Dashboard = ({ user }) => {
-  const [trades, setTrades] = useState([]);
-  const [botActive, setBotActive] = useState(false);
-  const [goldPrice, setGoldPrice] = useState(null);
-  const [priceSource, setPriceSource] = useState("…");
-  const [loadError, setLoadError] = useState("");
-  const chartRef = useRef(null);
-  const chartInstance = useRef(null);
+  const [payments, setPayments] = useState([]);
+  const [activeProduct, setActiveProduct] = useState(null);
 
-  const fetchTrades = useCallback(async () => {
-    const { data, error } = await supabaseClient
-      .from("trades").select("*").order("created_at", { ascending: false });
-    if (error) setLoadError(error.message);
-    else { setLoadError(""); setTrades(data || []); }
-  }, []);
+  const fetchPayments = useCallback(async () => {
+    const { data } = await supabaseClient
+      .from("payments").select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
+    setPayments(data || []);
+  }, [user.id]);
 
-  /* LIVE PRICE POLLING */
   useEffect(() => {
-    let alive = true;
-    const tick = async () => {
-      const p = await fetchLiveGold();
-      if (!alive) return;
-      if (p) { setGoldPrice(p); setPriceSource("LIVE"); }
-      else setPriceSource("OFFLINE");
-    };
-    tick();
-    const id = setInterval(tick, 3000);
-    return () => { alive = false; clearInterval(id); };
-  }, []);
-
-  /* REALTIME TRADES */
-  useEffect(() => {
-    fetchTrades();
-    const channel = supabaseClient
-      .channel("live-trades")
-      .on("postgres_changes", { event: "*", schema: "public", table: "trades" }, () => fetchTrades())
+    fetchPayments();
+    const ch = supabaseClient
+      .channel("user-payments")
+      .on("postgres_changes", { event: "*", schema: "public", table: "payments", filter: `user_id=eq.${user.id}` }, () => fetchPayments())
       .subscribe();
-    return () => { supabaseClient.removeChannel(channel); };
-  }, [fetchTrades]);
+    return () => supabaseClient.removeChannel(ch);
+  }, [fetchPayments, user.id]);
 
-  /* CHART */
-  useEffect(() => {
-    if (!chartRef.current) return;
-    chartInstance.current = new ApexCharts(chartRef.current, {
-      chart: { type: "area", height: 350, background: "transparent",
-        toolbar: { show: false },
-        animations: { enabled: true, easing: "linear", dynamicAnimation: { speed: 1000 } } },
-      theme: { mode: "dark" },
-      series: [{ name: "XAUUSD", data: [] }],
-      colors: ["#2dd4bf"],
-      fill: { type: "gradient", gradient: { opacityFrom: 0.3, opacityTo: 0 } },
-      stroke: { curve: "smooth", width: 2 },
-      grid: { borderColor: "rgba(255,255,255,0.05)" },
-      xaxis: { labels: { show: false }, axisBorder: { show: false }, axisTicks: { show: false } },
-      yaxis: { labels: { style: { colors: "#666", fontFamily: "JetBrains Mono" } } },
-      tooltip: { theme: "dark" },
-    });
-    chartInstance.current.render();
-    return () => chartInstance.current && chartInstance.current.destroy();
-  }, []);
-
-  useEffect(() => {
-    if (!chartInstance.current || goldPrice == null) return;
-    const existing = chartInstance.current.w.config.series[0].data || [];
-    const updated = [...existing, goldPrice].slice(-60);
-    chartInstance.current.updateSeries([{ name: "XAUUSD", data: updated }]);
-  }, [goldPrice]);
-
-  const createTrade = async (type) => {
-    if (!botActive) return alert("System Offline: Activate Neural Engine First");
-    if (goldPrice == null) return alert("No live price yet");
-    const entry = goldPrice;
-    const dir = type === "BUY" ? 1 : -1;
-    const positions = [1, 2, 3].map((i) => ({
-      user_id: user.id, type, symbol: "XAUUSD", lots: 0.5,
-      entry_price: entry,
-      tp: entry + dir * (i === 3 ? 50 : 20),
-      sl: entry - dir * 10,
-      status: "OPEN",
-    }));
-    const { error } = await supabaseClient.from("trades").insert(positions);
-    if (error) alert(error.message);
+  const statusFor = (productId) => {
+    const p = payments.find(p => p.product_id === productId);
+    return p?.status || null; // null | 'PENDING' | 'APPROVED' | 'REJECTED'
   };
-
-  const settleTrade = async (id) => {
-    const profit = (Math.random() * 1000 - 200).toFixed(2);
-    const { error } = await supabaseClient.from("trades")
-      .update({ status: "CLOSED", profit }).eq("id", id);
-    if (error) alert(error.message);
-  };
-
-  const openCount = useMemo(() => trades.filter((t) => t.status === "OPEN").length, [trades]);
-  const totalProfit = useMemo(
-    () => trades.reduce((acc, t) => acc + parseFloat(t.profit || 0), 0), [trades]);
 
   return (
-    <div className="max-w-7xl mx-auto p-6 space-y-6">
+    <div className="max-w-6xl mx-auto p-5 lg:p-10">
       {/* Header */}
-      <div className="glass rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
+      <header className="flex items-center justify-between mb-10 flex-wrap gap-4">
+        <div className="flex items-center gap-3">
           <div className="bg-teal-500/10 w-12 h-12 rounded-xl flex items-center justify-center border border-teal-500/20">
             <i className="fas fa-bolt text-teal-400 text-xl"></i>
           </div>
           <div>
-            <h1 className="text-xl font-bold tracking-tight">LIQUIDGOLD AI</h1>
-            <p className="text-[10px] text-gray-500 uppercase tracking-widest">{user?.email}</p>
+            <h1 className="text-xl font-bold tracking-tight">LIQUID<span className="text-teal-400">GOLD</span> AI</h1>
+            <p className="text-gray-500 text-[10px] uppercase tracking-widest">{user.email}</p>
           </div>
         </div>
-
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 text-xs text-gray-400 mr-2">
-            <span className="status-pulse"></span> Neural Link {priceSource}
+          <div className="flex items-center gap-2 text-xs text-gray-400 uppercase tracking-widest">
+            <span className="status-pulse"></span> Vault Online
           </div>
-          <button onClick={() => setBotActive(!botActive)}
-            className={`px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${
-              botActive
-                ? "bg-red-500/10 text-red-500 border border-red-500/50 active-pulse"
-                : "bg-teal-500 text-black hover:bg-teal-400"
-            }`}>
-            {botActive ? "TERMINATE ENGINE" : "ACTIVATE ENGINE"}
-          </button>
           <button onClick={() => supabaseClient.auth.signOut()}
             className="px-4 py-2.5 rounded-xl text-xs uppercase tracking-widest text-gray-400 border border-white/10 hover:bg-white/5">
             Logout
           </button>
         </div>
-      </div>
+      </header>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard label="XAUUSD Spot" value={goldPrice != null ? `$${goldPrice.toFixed(2)}` : "—"} sub={priceSource} color="text-teal-400" />
-        <StatCard label="Open Positions" value={openCount} sub="LIVE" color="text-white" />
-        <StatCard label="Net P/L" value={`$${totalProfit.toFixed(2)}`} sub="SESSION"
-          color={totalProfit >= 0 ? "text-teal-400" : "text-red-500"} />
-        <StatCard label="Total Records" value={trades.length} sub="ALL TIME" color="text-white" />
-      </div>
+      {/* Hero */}
+      <section className="glass rounded-3xl p-8 mb-8 teal-glow">
+        <div className="text-[10px] tracking-widest text-teal-400 uppercase mb-2">Institutional XAUUSD Arsenal</div>
+        <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-3">Two engines. One edge.</h2>
+        <p className="text-gray-400 max-w-2xl">Production-ready MT5 Expert Advisors engineered for XAUUSD. Pay once per EA, confirm your transaction, and download the compiled <span className="mono text-teal-400">.mq5</span> source instantly.</p>
+      </section>
 
-      {/* Chart + Bias */}
-      <div className="grid lg:grid-cols-3 gap-4">
-        <div className="glass rounded-2xl p-5 lg:col-span-2">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-bold uppercase tracking-widest">Neural Price Map</h2>
-            <div className="flex gap-2">
-              <button onClick={() => createTrade("BUY")}
-                className="bg-teal-500/10 text-teal-500 px-6 py-2 rounded-xl text-xs font-black border border-teal-500/20 hover:bg-teal-500 hover:text-black transition">
-                BUY
-              </button>
-              <button onClick={() => createTrade("SELL")}
-                className="bg-red-500/10 text-red-500 px-6 py-2 rounded-xl text-xs font-black border border-red-500/20 hover:bg-red-500 hover:text-white transition">
-                SELL
-              </button>
+      {/* Products */}
+      <section className="grid md:grid-cols-2 gap-6 mb-10">
+        {PRODUCTS.map(p => {
+          const status = statusFor(p.id);
+          return (
+            <div key={p.id} className="glass rounded-3xl p-7 flex flex-col">
+              <div className="flex items-start justify-between mb-4">
+                <div className="bg-teal-500/10 w-12 h-12 rounded-xl flex items-center justify-center border border-teal-500/20">
+                  <i className={`fas ${p.icon} text-teal-400 text-lg`}></i>
+                </div>
+                <span className="text-[10px] tracking-widest text-teal-400 bg-teal-500/10 border border-teal-500/20 px-2 py-1 rounded">{p.tag}</span>
+              </div>
+              <h3 className="text-lg font-bold mb-1">{p.name}</h3>
+              <p className="mono text-xs text-gray-500 mb-3">{p.file}</p>
+              <p className="text-sm text-gray-400 flex-1 mb-5">{p.desc}</p>
+              <div className="flex items-end justify-between mb-5">
+                <div>
+                  <div className="text-[10px] tracking-widest text-gray-500 uppercase">Unlock</div>
+                  <div className="text-3xl font-black mono">${p.price}</div>
+                </div>
+                <StatusBadge status={status} />
+              </div>
+              <ProductAction status={status} onUnlock={() => setActiveProduct(p)} product={p} user={user} />
             </div>
-          </div>
-          <div ref={chartRef}></div>
-        </div>
+          );
+        })}
+      </section>
 
-        <div className="glass rounded-2xl p-5">
-          <div className="space-y-3">
-            <h2 className="text-sm font-bold uppercase tracking-widest">Market Bias</h2>
-            <p className="text-2xl font-black text-teal-400">BULLISH BOS</p>
-            <div className="space-y-2 mt-4">
-              <BiasRow label="Trend" value="UP" />
-              <BiasRow label="Liquidity" value="BUY-SIDE" />
-              <BiasRow label="Session" value="LONDON" />
-              <BiasRow label="Volatility" value="HIGH" />
+      {/* Payment history */}
+      <PaymentHistory payments={payments} />
+
+      {activeProduct && (
+        <PaymentModal
+          product={activeProduct}
+          user={user}
+          existing={payments.find(p => p.product_id === activeProduct.id && p.status !== 'REJECTED')}
+          onClose={() => setActiveProduct(null)}
+        />
+      )}
+    </div>
+  );
+};
+
+const StatusBadge = ({ status }) => {
+  if (!status) return <span className="text-[10px] tracking-widest text-gray-500 uppercase">Locked</span>;
+  const map = {
+    PENDING: ["text-yellow-400", "bg-yellow-500/10", "border-yellow-500/30", "Awaiting Confirmation"],
+    APPROVED: ["text-teal-400", "bg-teal-500/10", "border-teal-500/30", "Unlocked"],
+    REJECTED: ["text-red-400", "bg-red-500/10", "border-red-500/30", "Rejected"],
+  };
+  const [c,b,br,t] = map[status] || map.PENDING;
+  return <span className={`text-[10px] tracking-widest uppercase px-2 py-1 rounded border ${c} ${b} ${br}`}>{t}</span>;
+};
+
+const ProductAction = ({ status, onUnlock, product, user }) => {
+  const [busy, setBusy] = useState(false);
+
+  const download = async () => {
+    setBusy(true);
+    try {
+      const { data, error } = await supabaseClient
+        .storage.from(STORAGE_BUCKET)
+        .createSignedUrl(product.file, 60);
+      if (error) throw error;
+      window.open(data.signedUrl, "_blank");
+    } catch (e) {
+      alert("Download unavailable: " + e.message + "\n\nAdmin must upload " + product.file + " to bucket '" + STORAGE_BUCKET + "'.");
+    } finally { setBusy(false); }
+  };
+
+  if (status === 'APPROVED') {
+    return (
+      <button onClick={download} disabled={busy}
+        className="w-full bg-teal-500 text-black font-black py-3.5 rounded-xl uppercase tracking-widest text-xs hover:bg-teal-400 transition disabled:opacity-50">
+        <i className="fas fa-download mr-2"></i>{busy ? "Preparing..." : "Download .mq5"}
+      </button>
+    );
+  }
+  if (status === 'PENDING') {
+    return (
+      <button onClick={onUnlock} className="w-full bg-yellow-500/10 text-yellow-400 border border-yellow-500/30 font-black py-3.5 rounded-xl uppercase tracking-widest text-xs hover:bg-yellow-500/20 transition">
+        <i className="fas fa-clock mr-2"></i>View Pending Confirmation
+      </button>
+    );
+  }
+  return (
+    <button onClick={onUnlock} className="w-full bg-teal-500 text-black font-black py-3.5 rounded-xl uppercase tracking-widest text-xs hover:bg-teal-400 transition">
+      <i className="fas fa-unlock mr-2"></i>Unlock for $100
+    </button>
+  );
+};
+
+/* ========== PAYMENT MODAL ========== */
+const PaymentModal = ({ product, user, existing, onClose }) => {
+  const [method, setMethod] = useState("MPESA");
+  const [txCode, setTxCode] = useState(existing?.tx_code || "");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [done, setDone] = useState(!!existing);
+
+  const copy = (txt) => {
+    navigator.clipboard.writeText(txt).then(() => {
+      const el = document.getElementById("copy-toast");
+      if (el) { el.style.opacity = 1; setTimeout(() => el.style.opacity = 0, 1500); }
+    });
+  };
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setError("");
+    if (!txCode.trim() || txCode.trim().length < 6) {
+      return setError("Enter the full transaction code from your payment confirmation.");
+    }
+    setSubmitting(true);
+    const payload = {
+      user_id: user.id,
+      user_email: user.email,
+      product_id: product.id,
+      product_name: product.name,
+      amount: product.price,
+      method,
+      tx_code: txCode.trim(),
+      status: "PENDING",
+    };
+    const { error } = await supabaseClient.from("payments").upsert(payload, { onConflict: "user_id,product_id" });
+    if (error) { setError(error.message); setSubmitting(false); return; }
+
+    // Telegram alert (opens chat with prefilled message to admin)
+    const msg = encodeURIComponent(
+      `🟢 NEW PAYMENT — LiquidGold AI\n` +
+      `Product: ${product.name}\n` +
+      `Amount: $${product.price}\n` +
+      `Method: ${method}\n` +
+      `Tx Code: ${txCode.trim()}\n` +
+      `User: ${user.email}\n` +
+      `User ID: ${user.id}`
+    );
+    window.open(`https://t.me/${TELEGRAM_ADMIN}?text=${msg}`, "_blank");
+
+    setDone(true);
+    setSubmitting(false);
+  };
+
+  return (
+    <div className="fixed inset-0 modal-bg z-50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
+      <div className="glass rounded-3xl max-w-lg w-full p-8 relative" onClick={e => e.stopPropagation()}>
+        <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-white">
+          <i className="fas fa-times text-lg"></i>
+        </button>
+
+        <div className="text-[10px] tracking-widest text-teal-400 uppercase mb-1">Unlock Access</div>
+        <h3 className="text-2xl font-bold mb-1">{product.name}</h3>
+        <p className="mono text-xs text-gray-500 mb-6">${product.price} · {product.file}</p>
+
+        {done ? (
+          <div className="text-center py-6">
+            <div className="bg-yellow-500/10 border border-yellow-500/30 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <i className="fas fa-clock text-yellow-400 text-2xl"></i>
             </div>
+            <h4 className="text-lg font-bold mb-2">Payment Submitted</h4>
+            <p className="text-sm text-gray-400 mb-6">
+              Your transaction code is being reviewed. You will see "Unlocked" and a download button on this page once admin approves it.
+            </p>
+            <a href={`https://t.me/${TELEGRAM_ADMIN}`} target="_blank" rel="noreferrer"
+              className="inline-flex items-center gap-2 text-teal-400 text-xs uppercase tracking-widest hover:underline">
+              <i className="fab fa-telegram"></i> Message admin on Telegram
+            </a>
           </div>
-          <p className="text-[10px] text-gray-500 mt-6 uppercase tracking-widest">
-            Updated {new Date().toLocaleTimeString()}
-          </p>
-        </div>
-      </div>
+        ) : (
+          <form onSubmit={submit} className="space-y-5">
+            {/* Method tabs */}
+            <div className="grid grid-cols-2 gap-2 bg-white/5 p-1 rounded-xl">
+              {["MPESA", "USDT_TRC20"].map(m => (
+                <button type="button" key={m} onClick={() => setMethod(m)}
+                  className={`py-2.5 rounded-lg text-xs font-black tracking-widest transition ${method===m ? "bg-teal-500 text-black" : "text-gray-400 hover:text-white"}`}>
+                  {m === "MPESA" ? "M-PESA" : "USDT TRC20"}
+                </button>
+              ))}
+            </div>
 
-      {/* Execution log */}
-      <div className="glass rounded-2xl p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-bold uppercase tracking-widest">Execution Log</h2>
-          <span className="text-[10px] text-gray-500">{trades.length} RECORDS</span>
-        </div>
+            {/* Payment details */}
+            {method === "MPESA" ? (
+              <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-2">
+                <div className="text-[10px] tracking-widest text-gray-500 uppercase">Send $100 (KES equivalent) to</div>
+                <div className="flex items-center justify-between">
+                  <span className="mono text-lg text-teal-400">{MPESA_NUMBER}</span>
+                  <button type="button" onClick={() => copy(MPESA_NUMBER)} className="text-xs text-gray-400 hover:text-teal-400 uppercase tracking-widest">
+                    <i className="fas fa-copy mr-1"></i>Copy
+                  </button>
+                </div>
+                <p className="text-[11px] text-gray-500">Then paste the M-Pesa confirmation code (e.g. <span className="mono">SEK4XYZ123</span>) below.</p>
+              </div>
+            ) : (
+              <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-2">
+                <div className="text-[10px] tracking-widest text-gray-500 uppercase">Send $100 USDT (TRC20) to</div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="mono text-xs text-teal-400 break-all">{USDT_TRC20}</span>
+                  <button type="button" onClick={() => copy(USDT_TRC20)} className="text-xs text-gray-400 hover:text-teal-400 uppercase tracking-widest shrink-0">
+                    <i className="fas fa-copy mr-1"></i>Copy
+                  </button>
+                </div>
+                <p className="text-[11px] text-gray-500">Then paste the on-chain transaction hash (TxID) below.</p>
+              </div>
+            )}
 
-        {loadError && (
-          <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-xs p-3 rounded-xl mb-3">
-            {loadError}
-          </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-gray-500 uppercase ml-2">Transaction Code / TxID</label>
+              <input type="text" value={txCode} onChange={e => setTxCode(e.target.value)}
+                placeholder={method === "MPESA" ? "e.g. SEK4XYZ123" : "e.g. 0xabc...def"}
+                className="w-full p-4 rounded-xl outline-none mono text-sm" />
+            </div>
+
+            {error && <div className="text-red-400 text-xs bg-red-500/10 border border-red-500/20 rounded-lg p-3">{error}</div>}
+
+            <button type="submit" disabled={submitting}
+              className="w-full bg-teal-500 text-black font-black py-4 rounded-xl uppercase tracking-widest text-sm hover:bg-teal-400 disabled:opacity-50 transition">
+              {submitting ? "Submitting..." : "Confirm Payment"}
+            </button>
+            <p className="text-[11px] text-gray-500 text-center">
+              On submit, an alert is sent to <span className="text-teal-400">@{TELEGRAM_ADMIN}</span> on Telegram. Access unlocks once verified.
+            </p>
+          </form>
         )}
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs mono">
-            <thead className="text-gray-500 uppercase tracking-widest">
-              <tr className="text-left">
-                <th className="py-2">Asset</th>
-                <th>Type</th>
-                <th>Lots</th>
-                <th>Price</th>
-                <th>Profit</th>
-                <th>Execution</th>
-              </tr>
-            </thead>
-            <tbody>
-              {trades.length === 0 ? (
-                <tr><td colSpan="6" className="text-center py-8 text-gray-600">No executions logged</td></tr>
-              ) : (
-                trades.map((t) => (
-                  <tr key={t.id} className="border-t border-white/5">
-                    <td className="py-3">{t.symbol}</td>
-                    <td className={t.type === "BUY" ? "text-teal-400" : "text-red-500"}>{t.type}</td>
-                    <td>{t.lots}</td>
-                    <td>{t.entry_price}</td>
-                    <td className={parseFloat(t.profit || 0) >= 0 ? "text-teal-400" : "text-red-500"}>
-                      ${parseFloat(t.profit || 0).toFixed(2)}
-                    </td>
-                    <td>
-                      {t.status === "OPEN" ? (
-                        <button onClick={() => settleTrade(t.id)}
-                          className="bg-teal-500/10 text-teal-500 border border-teal-500/30 px-4 py-1.5 rounded-lg text-[9px] font-black hover:bg-teal-500 hover:text-black transition">
-                          SETTLE
-                        </button>
-                      ) : (
-                        <span className="text-gray-500">CLOSED</span>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+        <div id="copy-toast" style={{transition:"opacity .3s",opacity:0}}
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-teal-500 text-black text-xs font-black px-4 py-2 rounded-lg uppercase tracking-widest">
+          Copied
         </div>
       </div>
     </div>
   );
 };
 
-const StatCard = ({ label, value, sub, color }) => (
-  <div className="glass rounded-2xl p-5">
-    <p className="text-[10px] text-gray-500 uppercase tracking-widest">{label}</p>
-    <p className={`text-2xl font-black mt-2 mono ${color}`}>{value}</p>
-    <p className="text-[10px] text-gray-600 uppercase tracking-widest mt-1">{sub}</p>
-  </div>
-);
-
-const BiasRow = ({ label, value }) => (
-  <div className="flex justify-between text-xs border-b border-white/5 pb-2">
-    <span className="text-gray-500 uppercase tracking-widest">{label}</span>
-    <span className="text-white font-bold mono">{value}</span>
-  </div>
+/* ========== HISTORY ========== */
+const PaymentHistory = ({ payments }) => (
+  <section className="glass rounded-3xl p-7">
+    <div className="flex items-center justify-between mb-5">
+      <h3 className="text-sm font-bold tracking-widest uppercase">Payment Ledger</h3>
+      <span className="text-[10px] tracking-widest text-gray-500">{payments.length} RECORDS</span>
+    </div>
+    {payments.length === 0 ? (
+      <p className="text-center text-gray-500 text-xs py-8 uppercase tracking-widest">No payments submitted</p>
+    ) : (
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead className="text-gray-500 uppercase tracking-widest text-[10px]">
+            <tr>
+              <th className="text-left py-2">Product</th>
+              <th className="text-left py-2">Method</th>
+              <th className="text-left py-2">Tx Code</th>
+              <th className="text-left py-2">Amount</th>
+              <th className="text-left py-2">Status</th>
+              <th className="text-left py-2">Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            {payments.map(p => (
+              <tr key={p.id} className="border-t border-white/5">
+                <td className="py-3">{p.product_name}</td>
+                <td className="py-3">{p.method}</td>
+                <td className="py-3 mono text-teal-400">{p.tx_code}</td>
+                <td className="py-3 mono">${p.amount}</td>
+                <td className="py-3"><StatusBadge status={p.status} /></td>
+                <td className="py-3 text-gray-500">{new Date(p.created_at).toLocaleString()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </section>
 );
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 </script>
 </body>
 </html>
-liquidgold-ai (1).html
-Displaying liquidgold-ai (1).html.
+liquidgold-ai (3).html
+Displaying liquidgold-ai (3).html.
