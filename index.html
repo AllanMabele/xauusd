@@ -67,33 +67,33 @@ const App = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const checkAdmin = async (u) => {
+  const checkAdmin = (u) => {
     if (!u) { setIsAdmin(false); return; }
-    // Primary: secure RPC defined in SQL
-    try {
-      const { data, error } = await supabaseClient.rpc("is_admin");
-      if (!error && typeof data === "boolean") { setIsAdmin(data); return; }
-    } catch (_) {}
-    // Fallback: email match (UI gate only — DB still enforces via RLS)
+    // Optimistic UI gate by email (DB still enforces via RLS).
+    // Set immediately so loading never blocks on a network call.
     setIsAdmin((u.email || "").toLowerCase() === ADMIN_EMAIL);
+    // Then confirm via RPC in background (non-blocking).
+    supabaseClient.rpc("is_admin").then(({ data, error }) => {
+      if (!error && typeof data === "boolean") setIsAdmin(data);
+    }).catch(() => {});
   };
 
   useEffect(() => {
     let mounted = true;
-    const { data: authListener } = supabaseClient.auth.onAuthStateChange(async (_e, session) => {
+    const finish = (session) => {
       if (!mounted) return;
       const u = session?.user || null;
       setUser(u);
-      await checkAdmin(u);
-    });
-    supabaseClient.auth.getSession().then(async ({ data }) => {
-      if (!mounted) return;
-      const u = data?.session?.user || null;
-      setUser(u);
-      await checkAdmin(u);
+      checkAdmin(u);
       setLoading(false);
+    };
+    const { data: authListener } = supabaseClient.auth.onAuthStateChange((_e, session) => {
+      finish(session);
     });
-    return () => { mounted = false; authListener.subscription.unsubscribe(); };
+    supabaseClient.auth.getSession().then(({ data }) => finish(data?.session));
+    // Safety net: never let the splash hang more than 3s
+    const t = setTimeout(() => { if (mounted) setLoading(false); }, 3000);
+    return () => { mounted = false; clearTimeout(t); authListener.subscription.unsubscribe(); };
   }, []);
 
   if (loading) {
