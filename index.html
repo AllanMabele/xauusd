@@ -50,6 +50,7 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const TELEGRAM_ADMIN = "LiquidM_Admin";
 const MPESA_NUMBER = "0701540201";
 const USDT_TRC20 = "TBr4ZsJky3ufBaA6WMFVJ7hX36Wtf29NRz";
+const PAYSTACK_LINK = "https://paystack.shop/pay/99upk80blz";
 const STORAGE_BUCKET = "ea-files";
 const ADMIN_EMAIL = "allymabz@gmail.com";
 
@@ -66,9 +67,8 @@ const App = () => {
   const [user, setUser] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
-  // 'catalog' (public landing) | 'auth' (login/register) | 'dashboard' (logged in)
   const [route, setRoute] = useState("catalog");
-  const [authMode, setAuthMode] = useState("login"); // 'login' | 'register'
+  const [authMode, setAuthMode] = useState("login");
   const [pendingProduct, setPendingProduct] = useState(null);
 
   const checkAdmin = (u) => {
@@ -107,7 +107,7 @@ const App = () => {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="status-pulse mx-auto mb-4"></div>
-          <p className="mono text-teal-400 text-xs uppercase tracking-widest">INITIALIZING TERMINAL...</p>
+          <div className="text-xs uppercase tracking-widest text-gray-500">INITIALIZING TERMINAL...</div>
         </div>
       </div>
     );
@@ -124,62 +124,48 @@ const App = () => {
   return <PublicCatalog onLoginClick={() => goAuth("login")} onRegisterClick={() => goAuth("register")} onBuyClick={(p) => goAuth("login", p)} />;
 };
 
-/* ========== PUBLIC NAV (shared) ========== */
-const PublicNav = ({ onLoginClick, onRegisterClick, user, onDashboardClick, onSignOut }) => (
-  <header className="glass rounded-2xl p-4 mb-8 flex items-center justify-between flex-wrap gap-4">
-    <div className="flex items-center gap-3">
-      <div className="w-10 h-10 rounded-xl bg-teal-500/10 border border-teal-500/30 flex items-center justify-center">
-        <i className="fa-solid fa-bolt text-teal-400"></i>
-      </div>
-      <div>
-        <h1 className="text-lg font-bold tracking-tight">LIQUIDGOLD AI</h1>
-        <p className="text-[10px] text-gray-500 uppercase tracking-widest mono">Institutional XAUUSD Terminal</p>
-      </div>
-    </div>
-    <nav className="flex items-center gap-2">
-      {user ? (
-        <>
-          <button onClick={onDashboardClick} className="px-4 py-2.5 rounded-xl text-xs uppercase tracking-widest text-teal-400 border border-teal-500/30 hover:bg-teal-500/10">Dashboard</button>
-          <button onClick={onSignOut} className="px-4 py-2.5 rounded-xl text-xs uppercase tracking-widest text-gray-400 border border-white/10 hover:bg-white/5">Logout</button>
-        </>
-      ) : (
-        <>
-          <button onClick={onLoginClick} className="px-4 py-2.5 rounded-xl text-xs uppercase tracking-widest text-gray-300 border border-white/10 hover:bg-white/5">Login</button>
-          <button onClick={onRegisterClick} className="px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest bg-teal-500 hover:bg-teal-400 text-black">Register</button>
-        </>
-      )}
-    </nav>
-  </header>
-);
-
-/* ========== PUBLIC CATALOG (no auth required to view) ========== */
+/* ========== PUBLIC CATALOG ========== */
 const PublicCatalog = ({ onLoginClick, onRegisterClick, onBuyClick }) => {
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
-      <PublicNav onLoginClick={onLoginClick} onRegisterClick={onRegisterClick} />
+    <div className="max-w-6xl mx-auto p-6 lg:p-10">
+      <div className="flex justify-between items-center mb-10">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-teal-500/20 border border-teal-500/30 flex items-center justify-center">
+            <i className="fas fa-wave-square text-teal-400"></i>
+          </div>
+          <div>
+            <h1 className="text-lg font-black tracking-wider">LIQUIDGOLD AI</h1>
+            <p className="text-[10px] text-gray-500 uppercase tracking-widest">Institutional XAUUSD Terminal</p>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={onLoginClick} className="px-4 py-2 rounded-xl text-xs uppercase tracking-widest text-gray-300 border border-white/10 hover:bg-white/5">Login</button>
+          <button onClick={onRegisterClick} className="px-4 py-2 rounded-xl text-xs uppercase tracking-widest bg-teal-500 text-black font-black hover:bg-teal-400">Register</button>
+        </div>
+      </div>
 
-      <section className="mb-10 text-center">
-        <h2 className="text-4xl md:text-5xl font-bold tracking-tight">Institutional XAUUSD Arsenal</h2>
-        <p className="text-teal-400 mono uppercase tracking-widest text-xs mt-3">Two engines. One edge.</p>
-        <p className="text-gray-400 max-w-2xl mx-auto mt-4">Production-ready MT5 Expert Advisors engineered for XAUUSD. Pay once per EA, confirm your transaction, and download the compiled .mq5 source instantly.</p>
-      </section>
+      <div className="text-center mb-10">
+        <h2 className="text-4xl lg:text-5xl font-black tracking-tight mb-3">Institutional XAUUSD Arsenal</h2>
+        <p className="text-teal-400 text-sm uppercase tracking-widest mb-4">Two engines. One edge.</p>
+        <p className="text-gray-400 max-w-2xl mx-auto">Production-ready MT5 Expert Advisors engineered for XAUUSD. Pay once per EA, confirm your transaction, and download the compiled .mq5 source instantly.</p>
+      </div>
 
       <div className="grid md:grid-cols-2 gap-6">
         {PRODUCTS.map(p => (
-          <div key={p.id} className="glass rounded-2xl p-6 teal-glow animate-fade-in">
-            <div className="flex items-start justify-between mb-4">
-              <div className="w-12 h-12 rounded-xl bg-teal-500/10 border border-teal-500/30 flex items-center justify-center">
-                <i className={`fa-solid ${p.icon} text-teal-400 text-xl`}></i>
+          <div key={p.id} className="glass rounded-2xl p-6 teal-glow">
+            <div className="flex justify-between items-start mb-4">
+              <div className="w-12 h-12 rounded-xl bg-teal-500/20 border border-teal-500/30 flex items-center justify-center">
+                <i className={`fas ${p.icon} text-teal-400 text-lg`}></i>
               </div>
-              <span className="text-[10px] mono uppercase tracking-widest text-teal-400 border border-teal-500/30 px-2 py-1 rounded">{p.tag}</span>
+              <span className="px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/30 text-teal-400 text-[10px] font-black tracking-widest">{p.tag}</span>
             </div>
-            <h3 className="text-xl font-bold">{p.name}</h3>
-            <p className="text-xs mono text-gray-500 mt-1">{p.file}</p>
-            <p className="text-sm text-gray-400 mt-3">{p.desc}</p>
-            <div className="flex items-end justify-between mt-6">
+            <h3 className="text-xl font-black mb-1">{p.name}</h3>
+            <p className="text-[10px] text-gray-500 uppercase tracking-widest mono mb-3">{p.file}</p>
+            <p className="text-sm text-gray-400 mb-6">{p.desc}</p>
+            <div className="flex items-center justify-between">
               <div>
-                <p className="text-[10px] uppercase tracking-widest text-gray-500">Unlock</p>
-                <p className="text-2xl font-bold text-teal-400">${p.price}</p>
+                <p className="text-[10px] text-gray-500 uppercase tracking-widest">Unlock</p>
+                <p className="text-2xl font-black text-teal-400">${p.price}</p>
               </div>
               <button onClick={() => onBuyClick(p)} className="px-5 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-black font-black uppercase text-xs tracking-widest">
                 Buy Now
@@ -189,7 +175,7 @@ const PublicCatalog = ({ onLoginClick, onRegisterClick, onBuyClick }) => {
         ))}
       </div>
 
-      <p className="text-center text-gray-500 text-xs mt-10">Login or register to purchase and download.</p>
+      <p className="text-center text-xs text-gray-500 uppercase tracking-widest mt-10">Login or register to purchase and download.</p>
     </div>
   );
 };
@@ -219,26 +205,26 @@ const AuthPage = ({ initialMode = "login", pendingProduct, onBack }) => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="glass rounded-2xl p-8 max-w-md w-full teal-glow animate-fade-in">
+    <div className="min-h-screen flex items-center justify-center p-6">
+      <div className="w-full max-w-md">
         <button onClick={onBack} className="text-xs uppercase tracking-widest text-gray-500 hover:text-teal-400 mb-4">
-          <i className="fa-solid fa-arrow-left mr-2"></i>Back to catalog
+          <i className="fas fa-arrow-left mr-2"></i>Back to catalog
         </button>
-        <div className="text-center mb-6">
-          <div className="w-14 h-14 mx-auto rounded-2xl bg-teal-500/10 border border-teal-500/30 flex items-center justify-center mb-3">
-            <i className="fa-solid fa-bolt text-teal-400 text-2xl"></i>
+        <div className="text-center mb-8">
+          <div className="w-16 h-16 mx-auto rounded-2xl bg-teal-500/20 border border-teal-500/30 flex items-center justify-center mb-4">
+            <i className="fas fa-wave-square text-teal-400 text-2xl"></i>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">LIQUIDGOLD AI</h1>
-          <p className="text-teal-400 mono uppercase tracking-widest text-xs mt-1">Neural Execution Link</p>
+          <h1 className="text-2xl font-black tracking-wider">LIQUIDGOLD AI</h1>
+          <p className="text-[10px] text-gray-500 uppercase tracking-widest">Neural Execution Link</p>
           {pendingProduct && (
-            <p className="text-gray-400 text-xs mt-3">Sign in to purchase <span className="text-teal-400">{pendingProduct.name}</span></p>
+            <p className="mt-3 text-xs text-teal-400 uppercase tracking-widest">Sign in to purchase {pendingProduct.name}</p>
           )}
         </div>
 
-        <form onSubmit={handleAuth} className="space-y-4">
+        <form onSubmit={handleAuth} className="glass rounded-2xl p-6 space-y-4">
           <div>
             <label className="text-[10px] uppercase tracking-widest text-gray-500">Node ID (Email)</label>
-            <input type="email" placeholder="trader@firm.com" className="w-full p-3 rounded-xl mt-1"
+            <input type="email" placeholder="ops@firm.com" className="w-full p-3 rounded-xl mt-1"
               value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
           </div>
           <div>
@@ -251,7 +237,7 @@ const AuthPage = ({ initialMode = "login", pendingProduct, onBack }) => {
           {error && <p className="text-red-400 text-xs">{error}</p>}
           {info && <p className="text-teal-400 text-xs">{info}</p>}
 
-          <button type="submit" disabled={loading} className="w-full py-3 rounded-xl bg-teal-500 hover:bg-teal-400 text-black font-black uppercase text-xs tracking-widest disabled:opacity-50">
+          <button type="submit" disabled={loading} className="w-full py-3 rounded-xl bg-teal-500 hover:bg-teal-400 text-black font-black uppercase tracking-widest text-xs disabled:opacity-50">
             {loading ? "ESTABLISHING..." : register ? "INITIALIZE ACCOUNT" : "ESTABLISH LINK"}
           </button>
           <button type="button" onClick={() => { setRegister(!register); setError(""); setInfo(""); }}
@@ -264,7 +250,7 @@ const AuthPage = ({ initialMode = "login", pendingProduct, onBack }) => {
   );
 };
 
-/* ========== DASHBOARD (auth required) ========== */
+/* ========== DASHBOARD ========== */
 const Dashboard = ({ user, isAdmin, onSignOut }) => {
   const [view, setView] = useState("user");
   const [payments, setPayments] = useState([]);
@@ -290,67 +276,67 @@ const Dashboard = ({ user, isAdmin, onSignOut }) => {
   const statusFor = (productId) => payments.find(p => p.product_id === productId)?.status || null;
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
-      <header className="glass rounded-2xl p-4 mb-8 flex items-center justify-between flex-wrap gap-4">
+    <div className="max-w-6xl mx-auto p-6 lg:p-10">
+      <div className="flex flex-wrap justify-between items-center gap-4 mb-10">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-teal-500/10 border border-teal-500/30 flex items-center justify-center">
-            <i className="fa-solid fa-bolt text-teal-400"></i>
+          <div className="w-10 h-10 rounded-xl bg-teal-500/20 border border-teal-500/30 flex items-center justify-center">
+            <i className="fas fa-wave-square text-teal-400"></i>
           </div>
           <div>
-            <h1 className="text-lg font-bold tracking-tight">LIQUIDGOLD AI</h1>
-            <p className="text-[10px] text-gray-500 uppercase tracking-widest mono">{user.email}{isAdmin && <span className="text-teal-400"> · ADMIN</span>}</p>
+            <h1 className="text-lg font-black tracking-wider">LIQUIDGOLD AI</h1>
+            <p className="text-[10px] text-gray-500 uppercase tracking-widest">{user.email}{isAdmin && <span className="text-teal-400"> · ADMIN</span>}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-3">
           {isAdmin && (
             <button onClick={() => setView(view === "admin" ? "user" : "admin")}
               className="px-4 py-2.5 rounded-xl text-xs uppercase tracking-widest text-teal-400 border border-teal-500/30 hover:bg-teal-500/10">
               {view === "admin" ? "User View" : "Admin Panel"}
             </button>
           )}
-          <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-teal-500/20">
-            <span className="status-pulse"></span>
-            <span className="text-[10px] mono uppercase tracking-widest text-teal-400">Vault Online</span>
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-white/10">
+            <div className="status-pulse"></div>
+            <span className="text-[10px] uppercase tracking-widest text-gray-400">Vault Online</span>
           </div>
           <button onClick={async () => { await supabaseClient.auth.signOut(); onSignOut && onSignOut(); }}
             className="px-4 py-2.5 rounded-xl text-xs uppercase tracking-widest text-gray-400 border border-white/10 hover:bg-white/5">
             Logout
           </button>
         </div>
-      </header>
+      </div>
 
       {view === "admin" && isAdmin ? (
         <AdminPanel />
       ) : (
         <>
-          <section className="mb-10 text-center">
-            <h2 className="text-4xl md:text-5xl font-bold tracking-tight">Institutional XAUUSD Arsenal</h2>
-            <p className="text-teal-400 mono uppercase tracking-widest text-xs mt-3">Two engines. One edge.</p>
-            <p className="text-gray-400 max-w-2xl mx-auto mt-4">Pay once per EA, confirm your transaction, and download the compiled .mq5 source instantly.</p>
-          </section>
+          <div className="text-center mb-10">
+            <h2 className="text-4xl lg:text-5xl font-black tracking-tight mb-3">Institutional XAUUSD Arsenal</h2>
+            <p className="text-teal-400 text-sm uppercase tracking-widest mb-4">Two engines. One edge.</p>
+            <p className="text-gray-400 max-w-2xl mx-auto">Pay once per EA, confirm your transaction, and download the compiled .mq5 source instantly.</p>
+          </div>
 
           <div className="grid md:grid-cols-2 gap-6">
             {PRODUCTS.map(p => {
               const status = statusFor(p.id);
               return (
-                <div key={p.id} className="glass rounded-2xl p-6 teal-glow animate-fade-in">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="w-12 h-12 rounded-xl bg-teal-500/10 border border-teal-500/30 flex items-center justify-center">
-                      <i className={`fa-solid ${p.icon} text-teal-400 text-xl`}></i>
+                <div key={p.id} className="glass rounded-2xl p-6 teal-glow flex flex-col">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="w-12 h-12 rounded-xl bg-teal-500/20 border border-teal-500/30 flex items-center justify-center">
+                      <i className={`fas ${p.icon} text-teal-400 text-lg`}></i>
                     </div>
-                    <span className="text-[10px] mono uppercase tracking-widest text-teal-400 border border-teal-500/30 px-2 py-1 rounded">{p.tag}</span>
+                    <span className="px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/30 text-teal-400 text-[10px] font-black tracking-widest">{p.tag}</span>
                   </div>
-                  <h3 className="text-xl font-bold">{p.name}</h3>
-                  <p className="text-xs mono text-gray-500 mt-1">{p.file}</p>
-                  <p className="text-sm text-gray-400 mt-3">{p.desc}</p>
-                  <div className="flex items-end justify-between mt-6">
+                  <h3 className="text-xl font-black mb-1">{p.name}</h3>
+                  <p className="text-[10px] text-gray-500 uppercase tracking-widest mono mb-3">{p.file}</p>
+                  <p className="text-sm text-gray-400 mb-6 flex-1">{p.desc}</p>
+                  <div className="flex items-center justify-between mb-4">
                     <div>
-                      <p className="text-[10px] uppercase tracking-widest text-gray-500">Unlock</p>
-                      <p className="text-2xl font-bold text-teal-400">${p.price}</p>
+                      <p className="text-[10px] text-gray-500 uppercase tracking-widest">Unlock</p>
+                      <p className="text-2xl font-black text-teal-400">${p.price}</p>
                     </div>
                     <StatusBadge status={status} />
                   </div>
-                  <div className="mt-5">
+                  <div>
                     <ProductAction status={status} onUnlock={() => setActiveProduct(p)} product={p} user={user} />
                   </div>
                 </div>
@@ -372,14 +358,14 @@ const Dashboard = ({ user, isAdmin, onSignOut }) => {
 };
 
 const StatusBadge = ({ status }) => {
-  if (!status) return <span className="text-[10px] mono uppercase tracking-widest text-gray-500 border border-white/10 px-2 py-1 rounded">Locked</span>;
+  if (!status) return <span className="px-3 py-1 rounded-full text-[10px] font-black tracking-widest bg-white/5 border border-white/10 text-gray-400">Locked</span>;
   const map = {
     PENDING:  ["text-yellow-400", "bg-yellow-500/10", "border-yellow-500/30", "Awaiting Confirmation"],
     APPROVED: ["text-teal-400",   "bg-teal-500/10",   "border-teal-500/30",   "Unlocked"],
     REJECTED: ["text-red-400",    "bg-red-500/10",    "border-red-500/30",    "Rejected"],
   };
   const [c,b,br,t] = map[status] || map.PENDING;
-  return <span className={`text-[10px] mono uppercase tracking-widest ${c} ${b} border ${br} px-2 py-1 rounded`}>{t}</span>;
+  return <span className={`px-3 py-1 rounded-full text-[10px] font-black tracking-widest ${c} ${b} border ${br}`}>{t}</span>;
 };
 
 const ProductAction = ({ status, onUnlock, product }) => {
@@ -395,12 +381,12 @@ const ProductAction = ({ status, onUnlock, product }) => {
     } finally { setBusy(false); }
   };
   if (status === 'APPROVED') {
-    return <button onClick={download} disabled={busy} className="w-full py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-black font-black uppercase text-xs tracking-widest disabled:opacity-50">{busy ? "Preparing..." : "Download .mq5"}</button>;
+    return <button onClick={download} disabled={busy} className="w-full py-3 rounded-xl bg-teal-500 hover:bg-teal-400 text-black font-black uppercase tracking-widest text-xs disabled:opacity-50">{busy ? "Preparing..." : "Download .mq5"}</button>;
   }
   if (status === 'PENDING') {
-    return <button onClick={onUnlock} className="w-full py-2.5 rounded-xl border border-yellow-500/40 text-yellow-400 hover:bg-yellow-500/10 font-black uppercase text-xs tracking-widest">View Pending Confirmation</button>;
+    return <button onClick={onUnlock} className="w-full py-3 rounded-xl border border-yellow-500/40 text-yellow-400 hover:bg-yellow-500/10 font-black uppercase tracking-widest text-xs">View Pending Confirmation</button>;
   }
-  return <button onClick={onUnlock} className="w-full py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-black font-black uppercase text-xs tracking-widest">Unlock for $100</button>;
+  return <button onClick={onUnlock} className="w-full py-3 rounded-xl bg-teal-500 hover:bg-teal-400 text-black font-black uppercase tracking-widest text-xs">Unlock for $100</button>;
 };
 
 /* ========== ADMIN PANEL ========== */
@@ -439,12 +425,12 @@ const AdminPanel = () => {
 
   return (
     <div className="glass rounded-2xl p-6">
-      <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
+      <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
         <div>
-          <h2 className="text-xl font-bold">Admin · Payment Approvals</h2>
-          <p className="text-[10px] mono uppercase tracking-widest text-gray-500">Approve or reject buyer transactions</p>
+          <h2 className="text-xl font-black tracking-wider">Admin · Payment Approvals</h2>
+          <p className="text-[10px] uppercase tracking-widest text-gray-500">Approve or reject buyer transactions</p>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2">
           {["PENDING","APPROVED","REJECTED","ALL"].map(f => (
             <button key={f} onClick={() => setFilter(f)}
               className={`px-3 py-2 rounded-lg text-[10px] font-black tracking-widest uppercase border ${filter===f ? "bg-teal-500 text-black border-teal-500" : "border-white/10 text-gray-400 hover:text-white"}`}>
@@ -454,38 +440,38 @@ const AdminPanel = () => {
         </div>
       </div>
 
-      {error && <p className="text-red-400 text-xs mb-3">{error}</p>}
+      {error && <p className="text-red-400 text-xs mb-4">{error}</p>}
 
       {loading ? (
-        <p className="text-gray-500 text-sm">Loading...</p>
+        <p className="text-gray-500 text-xs uppercase tracking-widest">Loading...</p>
       ) : rows.length === 0 ? (
-        <p className="text-gray-500 text-sm">No records.</p>
+        <p className="text-gray-500 text-xs uppercase tracking-widest">No records.</p>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead className="text-gray-500 uppercase tracking-widest">
-              <tr>
-                <th className="text-left p-2">User</th>
-                <th className="text-left p-2">Product</th>
-                <th className="text-left p-2">Method</th>
-                <th className="text-left p-2">Tx Code</th>
-                <th className="text-left p-2">Amount</th>
-                <th className="text-left p-2">Status</th>
-                <th className="text-left p-2">Date</th>
-                <th className="text-left p-2">Actions</th>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-[10px] uppercase tracking-widest text-gray-500 border-b border-white/10">
+                <th className="py-2 pr-4">User</th>
+                <th className="py-2 pr-4">Product</th>
+                <th className="py-2 pr-4">Method</th>
+                <th className="py-2 pr-4">Tx Code</th>
+                <th className="py-2 pr-4">Amount</th>
+                <th className="py-2 pr-4">Status</th>
+                <th className="py-2 pr-4">Date</th>
+                <th className="py-2">Actions</th>
               </tr>
             </thead>
             <tbody>
               {rows.map(r => (
-                <tr key={r.id} className="border-t border-white/5">
-                  <td className="p-2 mono text-gray-300">{r.user_email}</td>
-                  <td className="p-2">{r.product_name}</td>
-                  <td className="p-2">{r.method}</td>
-                  <td className="p-2 mono text-teal-400">{r.tx_code}</td>
-                  <td className="p-2">${r.amount}</td>
-                  <td className="p-2"><StatusBadge status={r.status} /></td>
-                  <td className="p-2 text-gray-500">{new Date(r.created_at).toLocaleString()}</td>
-                  <td className="p-2">
+                <tr key={r.id} className="border-b border-white/5">
+                  <td className="py-3 pr-4">{r.user_email}</td>
+                  <td className="py-3 pr-4">{r.product_name}</td>
+                  <td className="py-3 pr-4">{r.method}</td>
+                  <td className="py-3 pr-4 mono text-xs">{r.tx_code}</td>
+                  <td className="py-3 pr-4">${r.amount}</td>
+                  <td className="py-3 pr-4"><StatusBadge status={r.status} /></td>
+                  <td className="py-3 pr-4 text-xs text-gray-400">{new Date(r.created_at).toLocaleString()}</td>
+                  <td className="py-3">
                     <div className="flex gap-2">
                       <button disabled={busyId===r.id} onClick={() => setStatus(r, 'APPROVED')}
                         className="px-3 py-1.5 rounded-lg bg-teal-500 hover:bg-teal-400 text-black font-black uppercase text-[10px] tracking-widest disabled:opacity-40">Approve</button>
@@ -505,7 +491,7 @@ const AdminPanel = () => {
 
 /* ========== PAYMENT MODAL ========== */
 const PaymentModal = ({ product, user, existing, onClose }) => {
-  const [method, setMethod] = useState("MPESA");
+  const [method, setMethod] = useState(existing?.method || "MPESA");
   const [txCode, setTxCode] = useState(existing?.tx_code || "");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -521,7 +507,11 @@ const PaymentModal = ({ product, user, existing, onClose }) => {
   const submit = async (e) => {
     e.preventDefault();
     setError("");
-    if (!txCode.trim() || txCode.trim().length < 6) return setError("Enter the full transaction code from your payment confirmation.");
+    if (!txCode.trim() || txCode.trim().length < 6) {
+      return setError(method === "CARD"
+        ? "Enter the Paystack reference shown on your payment receipt (e.g. T123abc456)."
+        : "Enter the full transaction code from your payment confirmation.");
+    }
     setSubmitting(true);
     const payload = {
       user_id: user.id, user_email: user.email, product_id: product.id, product_name: product.name,
@@ -536,64 +526,89 @@ const PaymentModal = ({ product, user, existing, onClose }) => {
     setDone(true); setSubmitting(false);
   };
 
+  const methods = [
+    { id: "MPESA", label: "M-PESA" },
+    { id: "USDT_TRC20", label: "USDT TRC20" },
+    { id: "CARD", label: "Card" },
+  ];
+
   return (
-    <div className="fixed inset-0 modal-bg flex items-center justify-center p-4 z-50" onClick={onClose}>
-      <div className="glass rounded-2xl p-6 max-w-md w-full teal-glow animate-fade-in relative" onClick={(e) => e.stopPropagation()}>
-        <button onClick={onClose} className="absolute top-3 right-3 text-gray-500 hover:text-white"><i className="fa-solid fa-xmark"></i></button>
-        <h3 className="text-xl font-bold">Unlock Access</h3>
-        <p className="text-sm text-teal-400">{product.name}</p>
-        <p className="text-xs text-gray-500 mono">${product.price} · {product.file}</p>
+    <div className="fixed inset-0 modal-bg z-50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
+      <div className="glass rounded-2xl p-6 w-full max-w-lg relative" onClick={(e) => e.stopPropagation()}>
+        <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-white"><i className="fas fa-times"></i></button>
+        <h2 className="text-xl font-black tracking-wider mb-1">Unlock Access</h2>
+        <p className="text-teal-400 text-xs uppercase tracking-widest mb-1">{product.name}</p>
+        <p className="text-[10px] text-gray-500 uppercase tracking-widest mono mb-6">${product.price} · {product.file}</p>
 
         {done ? (
-          <div className="text-center mt-6">
-            <div className="w-14 h-14 mx-auto rounded-2xl bg-teal-500/10 border border-teal-500/30 flex items-center justify-center mb-3">
-              <i className="fa-solid fa-check text-teal-400 text-xl"></i>
+          <div className="text-center py-6">
+            <div className="w-16 h-16 mx-auto rounded-full bg-teal-500/20 border border-teal-500/30 flex items-center justify-center mb-4">
+              <i className="fas fa-check text-teal-400 text-2xl"></i>
             </div>
-            <h4 className="text-lg font-bold">Payment Submitted</h4>
-            <p className="text-sm text-gray-400 mt-2">Your transaction code is being reviewed. You will see "Unlocked" and a download button on this page once admin approves it.</p>
-            <a href={`https://t.me/${TELEGRAM_ADMIN}`} target="_blank" rel="noreferrer" className="inline-block mt-4 px-4 py-2 rounded-xl border border-teal-500/30 text-teal-400 hover:bg-teal-500/10 text-xs uppercase tracking-widest">Message admin on Telegram</a>
+            <h3 className="text-lg font-black mb-2">Payment Submitted</h3>
+            <p className="text-sm text-gray-400 mb-4">Your transaction code is being reviewed. You will see "Unlocked" and a download button on this page once admin approves it.</p>
+            <a href={`https://t.me/${TELEGRAM_ADMIN}`} target="_blank" rel="noreferrer" className="inline-block px-4 py-2 rounded-lg border border-teal-500/30 text-teal-400 text-xs uppercase tracking-widest hover:bg-teal-500/10">Message admin on Telegram</a>
           </div>
         ) : (
-          <form onSubmit={submit} className="space-y-4 mt-5">
-            <div className="grid grid-cols-2 gap-2 p-1 rounded-xl border border-white/10">
-              {["MPESA", "USDT_TRC20"].map(m => (
-                <button type="button" key={m} onClick={() => setMethod(m)}
-                  className={`py-2.5 rounded-lg text-xs font-black tracking-widest transition ${method===m ? "bg-teal-500 text-black" : "text-gray-400 hover:text-white"}`}>
-                  {m === "MPESA" ? "M-PESA" : "USDT TRC20"}
+          <form onSubmit={submit} className="space-y-4">
+            <div className="grid grid-cols-3 gap-2 p-1 rounded-xl bg-white/5 border border-white/10">
+              {methods.map(m => (
+                <button type="button" key={m.id} onClick={() => setMethod(m.id)}
+                  className={`py-2.5 rounded-lg text-xs font-black tracking-widest transition ${method===m.id ? "bg-teal-500 text-black" : "text-gray-400 hover:text-white"}`}>
+                  {m.label}
                 </button>
               ))}
             </div>
 
-            {method === "MPESA" ? (
-              <div className="p-4 rounded-xl border border-white/10">
-                <p className="text-[10px] uppercase tracking-widest text-gray-500">Send $100 (KES equivalent) to</p>
-                <div className="flex items-center justify-between mt-1">
-                  <p className="mono text-teal-400 text-lg">{MPESA_NUMBER}</p>
+            {method === "MPESA" && (
+              <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+                <p className="text-[10px] uppercase tracking-widest text-gray-500 mb-2">Send $100 (KES equivalent) to</p>
+                <div className="flex justify-between items-center">
+                  <p className="mono text-base text-teal-400">{MPESA_NUMBER}</p>
                   <button type="button" onClick={() => copy(MPESA_NUMBER)} className="text-xs text-gray-400 hover:text-teal-400 uppercase tracking-widest">Copy</button>
                 </div>
-                <p className="text-xs text-gray-500 mt-2">Then paste the M-Pesa confirmation code (e.g. SEK4XYZ123) below.</p>
+                <p className="text-[10px] text-gray-500 mt-3">Then paste the M-Pesa confirmation code (e.g. SEK4XYZ123) below.</p>
               </div>
-            ) : (
-              <div className="p-4 rounded-xl border border-white/10">
-                <p className="text-[10px] uppercase tracking-widest text-gray-500">Send $100 USDT (TRC20) to</p>
-                <div className="flex items-center justify-between gap-2 mt-1">
-                  <p className="mono text-teal-400 text-xs break-all">{USDT_TRC20}</p>
+            )}
+
+            {method === "USDT_TRC20" && (
+              <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+                <p className="text-[10px] uppercase tracking-widest text-gray-500 mb-2">Send $100 USDT (TRC20) to</p>
+                <div className="flex justify-between items-center gap-2">
+                  <p className="mono text-xs text-teal-400 break-all">{USDT_TRC20}</p>
                   <button type="button" onClick={() => copy(USDT_TRC20)} className="text-xs text-gray-400 hover:text-teal-400 uppercase tracking-widest shrink-0">Copy</button>
                 </div>
-                <p className="text-xs text-gray-500 mt-2">Then paste the on-chain transaction hash (TxID) below.</p>
+                <p className="text-[10px] text-gray-500 mt-3">Then paste the on-chain transaction hash (TxID) below.</p>
+              </div>
+            )}
+
+            {method === "CARD" && (
+              <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+                <p className="text-[10px] uppercase tracking-widest text-gray-500 mb-3">Pay $100 securely by card via Paystack</p>
+                <a href={PAYSTACK_LINK} target="_blank" rel="noreferrer"
+                  className="block w-full text-center py-3 rounded-xl bg-teal-500 hover:bg-teal-400 text-black font-black uppercase tracking-widest text-xs">
+                  <i className="fas fa-credit-card mr-2"></i>Pay with Card · ${product.price}
+                </a>
+                <div className="flex justify-between items-center gap-2 mt-3">
+                  <p className="mono text-[10px] text-teal-400 break-all">{PAYSTACK_LINK}</p>
+                  <button type="button" onClick={() => copy(PAYSTACK_LINK)} className="text-xs text-gray-400 hover:text-teal-400 uppercase tracking-widest shrink-0">Copy</button>
+                </div>
+                <p className="text-[10px] text-gray-500 mt-3">After payment, copy the Paystack reference from the receipt page or confirmation email and paste it below.</p>
               </div>
             )}
 
             <div>
-              <label className="text-[10px] uppercase tracking-widest text-gray-500">Transaction Code / TxID</label>
+              <label className="text-[10px] uppercase tracking-widest text-gray-500">
+                {method === "CARD" ? "Paystack Reference" : "Transaction Code / TxID"}
+              </label>
               <input type="text" value={txCode} onChange={(e) => setTxCode(e.target.value)}
-                placeholder={method === "MPESA" ? "e.g. SEK4XYZ123" : "e.g. 0xabc...def"}
+                placeholder={method === "MPESA" ? "e.g. SEK4XYZ123" : method === "CARD" ? "e.g. T123abc456xyz" : "e.g. 0xabc...def"}
                 className="w-full p-4 rounded-xl outline-none mono text-sm" />
             </div>
 
             {error && <p className="text-red-400 text-xs">{error}</p>}
 
-            <button type="submit" disabled={submitting} className="w-full py-3 rounded-xl bg-teal-500 hover:bg-teal-400 text-black font-black uppercase text-xs tracking-widest disabled:opacity-50">
+            <button type="submit" disabled={submitting} className="w-full py-3 rounded-xl bg-teal-500 hover:bg-teal-400 text-black font-black uppercase tracking-widest text-xs disabled:opacity-50">
               {submitting ? "Submitting..." : "Confirm Payment"}
             </button>
             <p className="text-[10px] text-gray-500 text-center">
@@ -602,7 +617,8 @@ const PaymentModal = ({ product, user, existing, onClose }) => {
           </form>
         )}
 
-        <div id="copy-toast" className="fixed bottom-6 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl bg-teal-500 text-black text-xs font-black uppercase tracking-widest opacity-0 transition-opacity">
+        <div id="copy-toast" style={{ opacity: 0, transition: 'opacity .3s' }}
+          className="absolute bottom-4 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-lg bg-teal-500 text-black text-[10px] font-black uppercase tracking-widest">
           Copied
         </div>
       </div>
@@ -611,35 +627,35 @@ const PaymentModal = ({ product, user, existing, onClose }) => {
 };
 
 const PaymentHistory = ({ payments }) => (
-  <div className="glass rounded-2xl p-6 mt-8">
-    <div className="flex items-center justify-between mb-4">
-      <h3 className="text-lg font-bold">Payment Ledger</h3>
-      <span className="text-[10px] mono uppercase tracking-widest text-gray-500">{payments.length} RECORDS</span>
+  <div className="glass rounded-2xl p-6 mt-10">
+    <div className="flex justify-between items-center mb-4">
+      <h2 className="text-lg font-black tracking-wider">Payment Ledger</h2>
+      <span className="text-[10px] uppercase tracking-widest text-gray-500">{payments.length} RECORDS</span>
     </div>
     {payments.length === 0 ? (
-      <p className="text-gray-500 text-sm">No payments submitted</p>
+      <p className="text-gray-500 text-xs uppercase tracking-widest">No payments submitted</p>
     ) : (
       <div className="overflow-x-auto">
-        <table className="w-full text-xs">
-          <thead className="text-gray-500 uppercase tracking-widest">
-            <tr>
-              <th className="text-left p-2">Product</th>
-              <th className="text-left p-2">Method</th>
-              <th className="text-left p-2">Tx Code</th>
-              <th className="text-left p-2">Amount</th>
-              <th className="text-left p-2">Status</th>
-              <th className="text-left p-2">Date</th>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-[10px] uppercase tracking-widest text-gray-500 border-b border-white/10">
+              <th className="py-2 pr-4">Product</th>
+              <th className="py-2 pr-4">Method</th>
+              <th className="py-2 pr-4">Tx Code</th>
+              <th className="py-2 pr-4">Amount</th>
+              <th className="py-2 pr-4">Status</th>
+              <th className="py-2">Date</th>
             </tr>
           </thead>
           <tbody>
             {payments.map(p => (
-              <tr key={p.id} className="border-t border-white/5">
-                <td className="p-2">{p.product_name}</td>
-                <td className="p-2">{p.method}</td>
-                <td className="p-2 mono text-teal-400">{p.tx_code}</td>
-                <td className="p-2">${p.amount}</td>
-                <td className="p-2"><StatusBadge status={p.status} /></td>
-                <td className="p-2 text-gray-500">{new Date(p.created_at).toLocaleString()}</td>
+              <tr key={p.id} className="border-b border-white/5">
+                <td className="py-3 pr-4">{p.product_name}</td>
+                <td className="py-3 pr-4">{p.method}</td>
+                <td className="py-3 pr-4 mono text-xs">{p.tx_code}</td>
+                <td className="py-3 pr-4">${p.amount}</td>
+                <td className="py-3 pr-4"><StatusBadge status={p.status} /></td>
+                <td className="py-3 text-xs text-gray-400">{new Date(p.created_at).toLocaleString()}</td>
               </tr>
             ))}
           </tbody>
